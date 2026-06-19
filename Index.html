@@ -1,0 +1,2190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Canvas Board — A Builder's Crash Course (merged edition)</title>
+<style>
+  :root{
+    /* System-font stacks — no external requests, looks right offline.
+       Named webfonts kept first as harmless progressive enhancement. */
+    --font-display:"Space Grotesk", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --font-body:"Source Serif 4", ui-serif, Georgia, Cambria, "Times New Roman", serif;
+    --font-mono:"JetBrains Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+
+    --paper:#FAFAF8;
+    --paper-2:#F2F1EC;
+    --ink:#16181D;
+    --muted:#5C616B;
+    --faint:#E3E1D9;
+    --accent:#2B44E0;
+    --accent-soft:#E9ECFD;
+    --code-bg:#15171D;
+    --code-fg:#D9DEE8;
+    --code-dim:#7E8696;
+    --code-accent:#9DB0FF;
+    --grid:rgba(22,24,29,.05);
+    --warn-bg:#FBF1E6;
+    --warn-edge:#E0A152;
+    --tip-bg:#EAF4EE;
+    --tip-edge:#5AA572;
+    --maxw:760px;
+  }
+  *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{
+    margin:0;
+    background-color:var(--paper);
+    background-image:radial-gradient(var(--grid) 1px, transparent 1px);
+    background-size:22px 22px;
+    color:var(--ink);
+    font-family:var(--font-body);
+    font-size:18px;line-height:1.72;-webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:1180px;margin:0 auto;padding:0 24px;}
+  .layout{display:grid;grid-template-columns:1fr;gap:0;}
+  @media(min-width:1080px){
+    .layout{grid-template-columns:240px minmax(0,var(--maxw)) 1fr;gap:48px;align-items:start;}
+  }
+
+  header.hero{padding:64px 0 28px;}
+  .eyebrow{font-family:var(--font-mono);font-size:12px;letter-spacing:.22em;text-transform:uppercase;color:var(--accent);margin:0 0 18px;}
+  h1{font-family:var(--font-display);font-weight:700;font-size:clamp(2.4rem,6vw,3.9rem);line-height:1.02;letter-spacing:-.02em;margin:0 0 18px;max-width:14ch;}
+  h1 .blink{color:var(--accent);}
+  .lede{font-size:1.18rem;color:var(--muted);max-width:56ch;margin:0 0 28px;}
+  .hero-canvas-shell{position:relative;border:1px solid var(--faint);border-radius:14px;overflow:hidden;background:#fff;box-shadow:0 1px 0 rgba(22,24,29,.04),0 18px 40px -28px rgba(22,24,29,.4);}
+  .hero-canvas-shell canvas{display:block;width:100%;height:230px;cursor:crosshair;touch-action:none;}
+  .hero-hint{position:absolute;left:14px;bottom:12px;font-family:var(--font-mono);font-size:12px;color:var(--muted);background:rgba(250,250,248,.82);padding:4px 9px;border-radius:7px;backdrop-filter:blur(4px);pointer-events:none;}
+  .hero-meta{display:flex;flex-wrap:wrap;gap:8px 18px;margin-top:20px;font-family:var(--font-mono);font-size:12.5px;color:var(--muted);}
+  .hero-meta span{display:inline-flex;align-items:center;gap:7px;}
+  .dot{width:7px;height:7px;border-radius:50%;background:var(--accent);}
+
+  nav.toc{position:sticky;top:24px;font-family:var(--font-display);display:none;max-height:calc(100vh - 48px);overflow:auto;}
+  @media(min-width:1080px){nav.toc{display:block;}}
+  nav.toc .toc-title{font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);margin:0 0 14px;}
+  nav.toc a{display:block;text-decoration:none;color:var(--muted);font-size:12.5px;padding:2.5px 0;border-left:2px solid transparent;padding-left:12px;margin-left:-2px;transition:color .15s,border-color .15s;}
+  nav.toc a:hover,nav.toc a.active{color:var(--ink);border-color:var(--accent);}
+  nav.toc a .n{color:var(--accent);font-family:var(--font-mono);font-size:11px;margin-right:7px;}
+
+  main{min-width:0;padding-bottom:80px;}
+  .rightrail{display:none;}
+  @media(min-width:1080px){.rightrail{display:block;}}
+
+  .contents{padding-top:30px;}
+  .contents .ctitle{font-family:var(--font-display);font-weight:600;font-size:1.2rem;margin:0 0 14px;display:flex;align-items:center;gap:10px;}
+  .contents .ctitle::before{content:"";width:26px;height:2px;background:var(--accent);display:inline-block;}
+  .toc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:9px;list-style:none;padding:0;margin:0;}
+  .toc-grid a{display:flex;gap:11px;align-items:baseline;text-decoration:none;border:1px solid var(--faint);border-radius:10px;padding:11px 13px;background:#fff;color:var(--ink);transition:border-color .15s,transform .12s;}
+  .toc-grid a:hover{border-color:var(--accent);transform:translateY(-2px);}
+  .toc-grid .n{font-family:var(--font-mono);color:var(--accent);font-size:12px;}
+  .toc-grid .t{font-family:var(--font-display);font-weight:500;font-size:14px;line-height:1.3;}
+
+  section{padding-top:48px;scroll-margin-top:24px;}
+  .sec-num{font-family:var(--font-mono);font-size:12px;color:var(--accent);letter-spacing:.14em;}
+  h2{font-family:var(--font-display);font-weight:600;font-size:1.85rem;line-height:1.12;letter-spacing:-.015em;margin:6px 0 16px;}
+  h3{font-family:var(--font-display);font-weight:600;font-size:1.18rem;margin:30px 0 10px;letter-spacing:-.01em;}
+  p{margin:0 0 16px;}
+  a{color:var(--accent);}
+  .xref{font-weight:600;text-decoration:none;border-bottom:1px solid var(--accent-soft);}
+  .xref:hover{border-bottom-color:var(--accent);}
+  strong{font-weight:600;}
+  ul,ol{margin:0 0 16px;padding-left:1.3em;}
+  li{margin:7px 0;}
+  .intro-rule{height:1px;background:linear-gradient(90deg,var(--accent),transparent);margin:34px 0 0;}
+
+  code{font-family:var(--font-mono);font-size:.86em;}
+  p code,li code,td code{background:var(--paper-2);padding:1px 6px;border-radius:5px;color:#33373f;border:1px solid var(--faint);}
+  pre{background:var(--code-bg);color:var(--code-fg);border-radius:12px;padding:18px;overflow:auto;font-size:13.5px;line-height:1.62;margin:0 0 18px;border-left:3px solid var(--accent);box-shadow:0 16px 36px -30px rgba(22,24,29,.7);}
+  pre code{font-family:var(--font-mono);font-size:13.5px;color:var(--code-fg);background:none;border:none;padding:0;}
+  pre .c{color:var(--code-dim);font-style:italic;}
+  pre .k{color:var(--code-accent);}
+  .filename{font-family:var(--font-mono);font-size:11.5px;color:var(--code-dim);background:var(--code-bg);border-radius:12px 12px 0 0;padding:9px 16px 0;margin-bottom:-12px;border-left:3px solid var(--accent);letter-spacing:.04em;}
+
+  .callout{border-radius:11px;padding:15px 18px 15px 16px;margin:0 0 18px;font-size:15.5px;line-height:1.62;border-left:4px solid;}
+  .callout p:last-child{margin-bottom:0;}
+  .callout .tag{font-family:var(--font-display);font-weight:600;font-size:12px;letter-spacing:.06em;text-transform:uppercase;display:block;margin-bottom:4px;}
+  .tip{background:var(--tip-bg);border-color:var(--tip-edge);}
+  .tip .tag{color:#3c7a52;}
+  .warn{background:var(--warn-bg);border-color:var(--warn-edge);}
+  .warn .tag{color:#a96a18;}
+
+  .demo{border:1px solid var(--faint);border-radius:14px;background:#fff;margin:22px 0;overflow:hidden;box-shadow:0 1px 0 rgba(22,24,29,.04);}
+  .demo-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 16px;border-bottom:1px solid var(--faint);background:var(--paper);}
+  .demo-head .label{font-family:var(--font-mono);font-size:11.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);display:flex;align-items:center;gap:8px;}
+  .demo-head .label::before{content:"▸ LIVE";font-weight:500;color:#c0322f;}
+  .demo-body{padding:16px;}
+  .demo canvas{display:block;width:100%;border-radius:9px;background:#fff;touch-action:none;border:1px solid var(--faint);}
+  .demo canvas:focus-visible{outline:3px solid var(--accent);outline-offset:2px;}
+  .controls{display:flex;flex-wrap:wrap;gap:9px;align-items:center;margin-top:12px;font-family:var(--font-display);}
+  button.btn,select.sel{font-family:var(--font-display);font-size:13.5px;font-weight:500;border:1px solid var(--faint);background:#fff;color:var(--ink);padding:7px 14px;border-radius:8px;cursor:pointer;transition:border-color .15s,background .15s;}
+  button.btn:hover,select.sel:hover{border-color:var(--accent);}
+  button.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent);}
+  button.btn.primary:hover{background:#1f36c4;}
+  .readout{font-family:var(--font-mono);font-size:12.5px;color:var(--muted);margin-left:auto;}
+  .readout b{color:var(--ink);font-weight:500;}
+  label.lbl{font-size:13.5px;color:var(--muted);display:inline-flex;align-items:center;gap:7px;cursor:pointer;}
+  .swatch-row{display:flex;gap:18px;flex-wrap:wrap;}
+  .swatch-row figure{margin:0;flex:1;min-width:140px;}
+  .swatch-row figcaption{font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-top:6px;text-align:center;}
+
+  .keys-vis{display:flex;gap:6px;flex-wrap:wrap;align-items:center;}
+  .keycap{font-family:var(--font-mono);font-size:12px;min-width:30px;text-align:center;padding:6px 9px;border:1px solid var(--faint);border-bottom-width:3px;border-radius:7px;background:#fff;color:var(--muted);transition:background .08s,color .08s,transform .08s,border-bottom-width .08s;}
+  .keycap.on{background:var(--accent);color:#fff;border-color:var(--accent);transform:translateY(1px);border-bottom-width:1px;}
+
+  .api-wrap{display:grid;grid-template-columns:1fr;gap:14px;}
+  @media(min-width:580px){.api-wrap{grid-template-columns:1.25fr .75fr;}}
+  .log{font-family:var(--font-mono);font-size:12px;line-height:1.5;background:var(--code-bg);color:var(--code-fg);border-radius:10px;padding:12px;min-height:170px;max-height:240px;overflow:auto;}
+  .log .ev{padding:1px 0;}
+  .log .ts{color:var(--code-dim);}
+  .log .nm{color:var(--code-accent);}
+  .json-out{font-family:var(--font-mono);font-size:11px;line-height:1.45;background:var(--code-bg);color:var(--code-fg);border-radius:10px;padding:12px;max-height:170px;overflow:auto;white-space:pre-wrap;word-break:break-word;margin-top:12px;display:none;border-left:3px solid var(--accent);}
+
+  a:focus-visible,button:focus-visible,select:focus-visible{outline:3px solid var(--accent);outline-offset:2px;border-radius:6px;}
+  .checklist{list-style:none;padding:0;}
+  .checklist li{padding-left:30px;position:relative;}
+  .checklist li::before{content:"";position:absolute;left:0;top:.42em;width:15px;height:15px;border:2px solid var(--accent);border-radius:4px;}
+  .checklist li::after{content:"✓";position:absolute;left:2px;top:-.04em;color:var(--accent);font-weight:700;font-size:14px;}
+  table{width:100%;border-collapse:collapse;margin:0 0 18px;font-size:14px;}
+  th,td{text-align:left;padding:9px 11px;border-bottom:1px solid var(--faint);vertical-align:top;}
+  th{font-family:var(--font-display);font-weight:600;font-size:12.5px;}
+  footer{border-top:1px solid var(--faint);padding:30px 0 60px;color:var(--muted);font-size:14px;font-family:var(--font-mono);}
+  .demo .out{font-family:var(--font-mono);font-size:12.5px;color:var(--muted);margin-top:10px;background:var(--paper);border:1px solid var(--faint);border-radius:8px;padding:8px 11px;min-height:18px;}
+  details.src{margin:-8px 0 22px;border:1px solid var(--faint);border-radius:10px;background:#fff;overflow:hidden;}
+  details.src>summary{cursor:pointer;list-style:none;font-family:var(--font-mono);font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);padding:10px 14px;user-select:none;}
+  details.src>summary::-webkit-details-marker{display:none;}
+  details.src>summary::before{content:"\\203A";display:inline-block;margin-right:8px;transition:transform .15s;}
+  details.src[open]>summary::before{transform:rotate(90deg);}
+  details.src>summary:hover{background:var(--paper);}
+  details.src pre{margin:0;border-radius:0;border-left:none;border-top:1px solid var(--faint);box-shadow:none;max-height:520px;}
+  .demo-grid{display:grid;grid-template-columns:1fr;gap:16px;}
+  @media(min-width:640px){.demo-grid{grid-template-columns:1fr 1fr;}}
+  .merge-note{font-size:14.5px;}
+  @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto;}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<div class="layout">
+
+  <!-- ===================== LEFT NAV ===================== -->
+  <nav class="toc" aria-label="Contents">
+    <p class="toc-title">The Course</p>
+    <a href="#model"><span class="n">00</span>Mental model</a>
+    <a href="#reusable"><span class="n">01</span>What makes it reusable</a>
+    <a href="#patterns"><span class="n">02</span>JS approaches</a>
+    <a href="#modules"><span class="n">03</span>Module systems</a>
+    <a href="#skeleton"><span class="n">04</span>Project skeleton</a>
+    <a href="#setup"><span class="n">05</span>Canvas &amp; DPR</a>
+    <a href="#coords"><span class="n">06</span>Coordinates &amp; camera</a>
+    <a href="#loop"><span class="n">07</span>Render loop</a>
+    <a href="#shapes"><span class="n">08</span>Shapes &amp; hit-testing</a>
+    <a href="#input"><span class="n">09</span>Pointer input</a>
+    <a href="#keys"><span class="n">10</span>Mouse &amp; keyboard</a>
+    <a href="#sprites"><span class="n">11</span>Image frames (PNG)</a>
+    <a href="#anim"><span class="n">12</span>Animation</a>
+    <a href="#custom"><span class="n">13</span>Customization</a>
+    <a href="#api"><span class="n">14</span>Public API</a>
+    <a href="#frameworks"><span class="n">15</span>Framework interop</a>
+    <a href="#state"><span class="n">16</span>Save / load / export</a>
+    <a href="#undo"><span class="n">17</span>Undo &amp; redo</a>
+    <a href="#perf"><span class="n">18</span>Performance</a>
+    <a href="#a11y"><span class="n">19</span>Accessibility</a>
+    <a href="#testing"><span class="n">20</span>Testing</a>
+    <a href="#life"><span class="n">21</span>Lifecycle</a>
+    <a href="#ship"><span class="n">22</span>Shipping it</a>
+    <a href="#gotchas"><span class="n">23</span>Gotchas</a>
+    <a href="#checklist"><span class="n">24</span>Checklist</a>
+  </nav>
+
+  <!-- ===================== MAIN ===================== -->
+  <main>
+    <header class="hero">
+      <p class="eyebrow">Vanilla JS · HTML Canvas · No dependencies · Works offline</p>
+      <h1>Building a reusable drawing&#8209;board<span class="blink">_</span></h1>
+      <p class="lede">A hands-on crash course in JavaScript component patterns, input, animation, frame-based imagery, API design, framework interop and packaging — with live demos you can poke at, and the <strong>full runnable source beside every one</strong>. One self-contained file: no network, no build, no dependencies.</p>
+      <div class="hero-canvas-shell">
+        <canvas id="heroCanvas" aria-label="Interactive canvas: drag to draw; shapes drift in the background"></canvas>
+        <span class="hero-hint">drag to draw &nbsp;·&nbsp; canvas teaching canvas</span>
+      </div>
+      <div class="hero-meta">
+        <span><i class="dot"></i>25 sections</span>
+        <span><i class="dot"></i>13 live demos + source</span>
+        <span><i class="dot"></i>zero external requests</span>
+      </div>
+      <div class="intro-rule"></div>
+        <details class="src"><summary>View source &mdash; hero canvas</summary><pre><code>safe('hero', function(){
+    var canvas = document.getElementById('heroCanvas'); if(!canvas) return;
+    var v = makeView(canvas);
+    var shapes = [], strokes = [], cur = null, running = false, raf, last = 0;
+    var palette = ['#2B44E0','#ff5577','#37b88f','#E8820C','#7b5cff'];
+    for (var i=0;i&lt;7;i++){
+      shapes.push({ x:Math.random()*v.w, y:Math.random()*v.h, vx:(Math.random()-.5)*40, vy:(Math.random()-.5)*40,
+        r:10+Math.random()*26, c:palette[i%palette.length], a:.14+Math.random()*.12 });
+    }
+    function toLocal(e){ var r=canvas.getBoundingClientRect(); return {x:e.clientX-r.left,y:e.clientY-r.top}; }
+    canvas.addEventListener('pointerdown',function(e){ canvas.setPointerCapture(e.pointerId); cur={c:'#16181D',pts:[toLocal(e)]}; strokes.push(cur); });
+    canvas.addEventListener('pointermove',function(e){ if(cur) cur.pts.push(toLocal(e)); });
+    window.addEventListener('pointerup',function(){ cur=null; });
+    function frame(now){
+      if(!running) return;
+      var dt=Math.min((now-last)/1000,0.05); last=now;
+      var ctx=v.ctx, W=v.w, H=v.h;
+      ctx.clearRect(0,0,W,H);
+      ctx.strokeStyle='rgba(22,24,29,0.04)'; ctx.lineWidth=1;
+      for(var gx=0;gx&lt;W;gx+=22){ ctx.beginPath();ctx.moveTo(gx,0);ctx.lineTo(gx,H);ctx.stroke(); }
+      for(var gy=0;gy&lt;H;gy+=22){ ctx.beginPath();ctx.moveTo(0,gy);ctx.lineTo(W,gy);ctx.stroke(); }
+      shapes.forEach(function(s){
+        if(!reduce){ s.x+=s.vx*dt; s.y+=s.vy*dt;
+          if(s.x&lt;s.r||s.x&gt;W-s.r)s.vx*=-1; if(s.y&lt;s.r||s.y&gt;H-s.r)s.vy*=-1;
+          s.x=Math.max(s.r,Math.min(W-s.r,s.x)); s.y=Math.max(s.r,Math.min(H-s.r,s.y)); }
+        ctx.save(); ctx.globalAlpha=s.a; ctx.fillStyle=s.c; ctx.beginPath(); ctx.arc(s.x,s.y,s.r,0,Math.PI*2); ctx.fill(); ctx.restore();
+      });
+      strokes.forEach(function(st){
+        if(st.pts.length&lt;2) return;
+        ctx.save(); ctx.strokeStyle=st.c; ctx.lineWidth=2.5; ctx.lineJoin='round'; ctx.lineCap='round';
+        ctx.beginPath(); ctx.moveTo(st.pts[0].x,st.pts[0].y);
+        for(var j=1;j&lt;st.pts.length;j++) ctx.lineTo(st.pts[j].x,st.pts[j].y);
+        ctx.stroke(); ctx.restore();
+      });
+      raf=requestAnimationFrame(frame);
+    }
+    v.onResize=function(){ if(!running){ running=true; frame(performance.now()); running=false; } };
+    whenVisible(canvas,
+      function(){ if(running)return; v.refit(); running=true; last=performance.now(); raf=requestAnimationFrame(frame); },
+      function(){ running=false; cancelAnimationFrame(raf); });
+  });</code></pre></details>
+
+      <div class="callout tip merge-note"><span class="tag">About this edition</span><p>This merges three crash-course drafts into one document and, per request, attaches the <strong>complete source code</strong> beneath each live demo — click "View source" to see the exact code that's running. Every demo shares the small harness shown once below; each demo's own code is otherwise self-contained.</p></div>
+      <details class="src" style="margin-top:14px"><summary>View source &mdash; shared demo harness (used by every demo)</summary><pre><code>var reduce = window.matchMedia &amp;&amp; window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var DPR = Math.min(window.devicePixelRatio || 1, 2);
+  var views = [];   // every makeView() registers here so one resize handler can refit all
+
+  function onReady(fn){
+    function go(){ requestAnimationFrame(function(){ requestAnimationFrame(fn); }); }
+    if (document.readyState === 'complete') { go(); }
+    else { window.addEventListener('load', go, { once:true }); }
+  }
+
+  // Run a demo in isolation: a failure logs a clear note but never breaks the page or other demos.
+  function safe(name, fn){
+    try { fn(); }
+    catch (e){ if (window.console &amp;&amp; console.warn) console.warn('[demo: ' + name + '] ' + (e &amp;&amp; e.message ? e.message : e)); }
+  }
+
+  // A self-correcting view over a canvas. NB: no ResizeObserver here on purpose — drawing to a
+  // canvas from inside an RO callback can trigger the "ResizeObserver loop" console error. We
+  // re-fit explicitly: at boot, when a demo scrolls into view, and on a debounced window resize.
+  function makeView(canvas, opts){
+    opts = opts || {};
+    var ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error('2D context unavailable');
+    var v = { ctx: ctx, w: 0, h: 0, onResize: null, refit: refit };
+    function refit(){
+      var rect = canvas.getBoundingClientRect();
+      var cssW = Math.round(rect.width) || canvas.clientWidth
+              || (canvas.parentElement ? canvas.parentElement.clientWidth : 0) || 600;
+      var attrH = parseInt(canvas.getAttribute('height'), 10);
+      var cssH = opts.fixedHeight || attrH || Math.round(rect.height) || 180;
+      if (cssW === v.w &amp;&amp; cssH === v.h &amp;&amp; canvas.width) return false;
+      canvas.style.height = cssH + 'px';
+      canvas.width  = Math.max(1, Math.round(cssW * DPR));
+      canvas.height = Math.max(1, Math.round(cssH * DPR));
+      ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+      v.w = cssW; v.h = cssH;
+      return true;
+    }
+    refit();
+    views.push(v);
+    return v;
+  }
+
+  function whenVisible(el, start, stop){
+    if (!('IntersectionObserver' in window)){ start(); return; }
+    var io = new IntersectionObserver(function(ents){
+      ents.forEach(function(e){ e.isIntersecting ? start() : stop(); });
+    }, { threshold: 0.01 });
+    io.observe(el);
+  }</code></pre></details>
+
+      <div class="contents">
+        <p class="ctitle">Table of contents</p>
+        <ul class="toc-grid">
+          <li><a href="#model"><span class="n">00</span><span class="t">Mental model</span></a></li>
+          <li><a href="#reusable"><span class="n">01</span><span class="t">What makes a component reusable</span></a></li>
+          <li><a href="#patterns"><span class="n">02</span><span class="t">Alternative approaches in JavaScript</span></a></li>
+          <li><a href="#modules"><span class="n">03</span><span class="t">Module systems &amp; build outputs</span></a></li>
+          <li><a href="#skeleton"><span class="n">04</span><span class="t">Project skeleton</span></a></li>
+          <li><a href="#setup"><span class="n">05</span><span class="t">Canvas setup &amp; DPR</span></a></li>
+          <li><a href="#coords"><span class="n">06</span><span class="t">Coordinates &amp; camera</span></a></li>
+          <li><a href="#loop"><span class="n">07</span><span class="t">The render loop</span></a></li>
+          <li><a href="#shapes"><span class="n">08</span><span class="t">Shapes &amp; hit-testing</span></a></li>
+          <li><a href="#input"><span class="n">09</span><span class="t">Pointer input</span></a></li>
+          <li><a href="#keys"><span class="n">10</span><span class="t">Mouse &amp; keyboard input</span></a></li>
+          <li><a href="#sprites"><span class="n">11</span><span class="t">Rapidly changing images (PNG)</span></a></li>
+          <li><a href="#anim"><span class="n">12</span><span class="t">Animation &amp; tweening</span></a></li>
+          <li><a href="#custom"><span class="n">13</span><span class="t">Customization options</span></a></li>
+          <li><a href="#api"><span class="n">14</span><span class="t">Designing the public API</span></a></li>
+          <li><a href="#frameworks"><span class="n">15</span><span class="t">Using it inside a framework</span></a></li>
+          <li><a href="#state"><span class="n">16</span><span class="t">Save, load &amp; export</span></a></li>
+          <li><a href="#undo"><span class="n">17</span><span class="t">Undo &amp; redo</span></a></li>
+          <li><a href="#perf"><span class="n">18</span><span class="t">Performance toolkit</span></a></li>
+          <li><a href="#a11y"><span class="n">19</span><span class="t">Accessibility</span></a></li>
+          <li><a href="#testing"><span class="n">20</span><span class="t">Testing the component</span></a></li>
+          <li><a href="#life"><span class="n">21</span><span class="t">Lifecycle &amp; cleanup</span></a></li>
+          <li><a href="#ship"><span class="n">22</span><span class="t">Shipping it as a library</span></a></li>
+          <li><a href="#gotchas"><span class="n">23</span><span class="t">Gotchas &amp; pro tips</span></a></li>
+          <li><a href="#checklist"><span class="n">24</span><span class="t">The build checklist</span></a></li>
+        </ul>
+      </div>
+    </header>
+
+    <!-- 00 -->
+    <section id="model">
+      <span class="sec-num">SECTION 00</span>
+      <h2>The mental model first</h2>
+      <p>Before any code, internalize the distinction that governs everything else.</p>
+      <ul>
+        <li><strong>Immediate-mode rendering</strong> — what raw canvas gives you. You call <code>ctx.fillRect(...)</code> and pixels appear. The canvas remembers <em>nothing</em>; there are no "objects" on it.</li>
+        <li><strong>Retained-mode rendering</strong> — what the DOM and SVG give you. You describe objects; the system keeps them and redraws for you.</li>
+      </ul>
+      <p>A board with custom shapes, animation and interactivity needs the <em>benefits</em> of retained mode sitting on top of an immediate-mode surface. So the core job of your library is simple to state:</p>
+      <div class="callout tip"><span class="tag">The whole idea</span><p>Keep a model of the scene in JS, and re-render that model to the canvas every frame. State → render loop → pixels → input → back to state. Get this loop right and everything else is detail.</p></div>
+    </section>
+
+    <!-- 01 NEW -->
+    <section id="reusable">
+      <span class="sec-num">SECTION 01</span>
+      <h2>What makes a JavaScript component reusable</h2>
+      <p>"Reusable" has a concrete test: a stranger can drop your component into a project you've never seen, configure it for their case, run several copies on one page, and remove it cleanly — all <em>without reading your source</em>. Five properties get you there.</p>
+      <ol>
+        <li><strong>Encapsulation.</strong> Internal state is private so consumers can't reach in and break your invariants. JavaScript gives you several ways to hide state — closures, <code>#private</code> fields, <code>WeakMap</code>, or a leading-underscore convention (see <a class="xref" href="#patterns">§02</a>).</li>
+        <li><strong>A small, explicit contract.</strong> A handful of methods, events and options. Everything else is implementation detail you stay free to change without breaking anyone.</li>
+        <li><strong>No hidden dependencies.</strong> It must not assume a global, a specific element id, a framework, or that it's the only instance on the page. Pass in what it needs — this is <em>dependency injection</em>.</li>
+        <li><strong>Configurable, with sane defaults.</strong> Useful at zero config; bends to many cases through options and extension points (see <a class="xref" href="#custom">§13</a>).</li>
+        <li><strong>An explicit lifecycle.</strong> <code>create</code> and <code>destroy</code> so it can be spun up and torn down repeatedly with no leaks (see <a class="xref" href="#life">§21</a>).</li>
+      </ol>
+
+      <h3>The one mistake that quietly kills reuse: shared state</h3>
+      <p>Module-level mutable state is shared by every "instance," so two boards on one page corrupt each other. State must live <em>per instance</em>.</p>
+      <pre><code><span class="c">// ❌ module-level state — every "board" shares one array</span>
+<span class="k">let</span> shapes = [];
+<span class="k">export function</span> addShape(s) { shapes.push(s); }
+
+<span class="c">// ✅ each board owns its own state</span>
+<span class="k">export function</span> createBoard(canvas) {
+  <span class="k">const</span> shapes = [];                 <span class="c">// private &amp; per-instance</span>
+  <span class="k">return</span> { add: (s) =&gt; shapes.push(s) };
+}</code></pre>
+
+      <h3>Inject dependencies; don't reach for globals</h3>
+      <pre><code><span class="c">// ❌ hardcoded global lookup — one instance only, untestable, brittle</span>
+<span class="k">const</span> canvas = document.getElementById('board');
+
+<span class="c">// ✅ the caller supplies the surface (and, for tests, even the clock)</span>
+<span class="k">class</span> DrawBoard {
+  constructor(target, { now = () =&gt; performance.now() } = {}) {
+    this.canvas = <span class="k">typeof</span> target === 'string'
+      ? document.querySelector(target)   <span class="c">// accept a selector…</span>
+      : target;                          <span class="c">// …or a node the caller already has</span>
+    this.now = now;                      <span class="c">// injected clock = deterministic tests</span>
+  }
+}</code></pre>
+      <div class="callout warn"><span class="tag">Reuse anti-patterns</span><p>Side effects at import time, hardcoded selectors, reading or writing <code>window.*</code>, throwing on missing <em>optional</em> config, and assuming a single instance. Each one is a tripwire for the next person who tries to reuse your code.</p></div>
+    </section>
+
+    <!-- 02 NEW (absorbs packaging) -->
+    <section id="patterns">
+      <span class="sec-num">SECTION 02</span>
+      <h2>Alternative approaches in JavaScript</h2>
+      <p>There's no single "right" way to author a component in JS. The language offers several, each with different ergonomics around privacy, <code>this</code>, inheritance and how consumers use it. Here are the eight worth knowing, with when to pick each.</p>
+
+      <h3>1 · ES Class</h3>
+      <pre><code><span class="k">export class</span> DrawBoard {
+  #shapes = [];                       <span class="c">// hard-private field</span>
+  <span class="k">static</span> from(json) { <span class="c">/* named constructor */</span> }
+  <span class="k">get</span> count() { <span class="k">return</span> this.#shapes.length; }
+  add = (s) =&gt; { this.#shapes.push(s); <span class="k">return this</span>; };  <span class="c">// arrow field → `this` is bound</span>
+}</code></pre>
+      <p>Discoverable, great tooling, real inheritance and <code>instanceof</code>. The arrow-field trick sidesteps the classic <code>this</code>-binding bug when a method is passed as a callback. <strong>The default recommendation.</strong></p>
+
+      <h3>2 · Factory function + closures</h3>
+      <pre><code><span class="k">export function</span> createDrawBoard(canvas, opts = {}) {
+  <span class="k">const</span> shapes = [];                  <span class="c">// private by closure — no #, no this</span>
+  <span class="k">const</span> api = {
+    add(s) { shapes.push(s); <span class="k">return</span> api; },
+    <span class="k">get</span> count() { <span class="k">return</span> shapes.length; },
+  };
+  <span class="k">return</span> Object.freeze(api);          <span class="c">// optionally lock the public surface</span>
+}</code></pre>
+      <p>Airtight privacy, no <code>this</code>, and you return <em>only</em> the public API. Methods are re-created per instance (negligible cost); no <code>instanceof</code>. Ideal for a functional style.</p>
+
+      <h3>3 · Module / revealing-module pattern (IIFE)</h3>
+      <pre><code><span class="k">const</span> BoardKit = (<span class="k">function</span>() {
+  <span class="k">let</span> registered = {};                <span class="c">// private</span>
+  <span class="k">function</span> register(name, fn) { registered[name] = fn; }
+  <span class="k">return</span> { register };               <span class="c">// reveal a subset</span>
+})();</code></pre>
+      <p>The pre-ESM classic. It naturally produces a <em>singleton</em>, which is great for a shared registry or a global <code>&lt;script&gt;</code> build, but wrong when you need many instances — use a factory or class for those. UMD bundles still use this shape to expose a global.</p>
+
+      <h3>4 · Web Component (Custom Element + Shadow DOM)</h3>
+      <pre><code><span class="k">class</span> DrawBoardEl <span class="k">extends</span> HTMLElement {
+  <span class="k">static</span> observedAttributes = ['theme'];
+  #board;
+  connectedCallback() {
+    <span class="k">const</span> root = this.attachShadow({ mode: 'open' });   <span class="c">// style isolation</span>
+    <span class="k">const</span> canvas = document.createElement('canvas');
+    root.append(canvas);
+    this.#board = <span class="k">new</span> DrawBoard(canvas, { theme: this.getAttribute('theme') });
+  }
+  attributeChangedCallback(name, _old, val) { this.#board?.set(name, val); }
+  disconnectedCallback() { this.#board?.destroy(); }   <span class="c">// automatic cleanup</span>
+}
+customElements.define('draw-board', DrawBoardEl);</code></pre>
+      <p>Usable as plain HTML (<code>&lt;draw-board theme="dark"&gt;&lt;/draw-board&gt;</code>), framework-agnostic, style-encapsulated, with a lifecycle the platform runs for you. Costs: more ceremony, string-only attributes, and SSR/hydration nuances. The strongest "reuse everywhere" option (more in <a class="xref" href="#frameworks">§15</a>).</p>
+
+      <h3>5 · Prototype + <code>Object.create</code></h3>
+      <pre><code><span class="k">const</span> BoardProto = {
+  add(s) { this.shapes.push(s); <span class="k">return this</span>; },
+};
+<span class="k">function</span> makeBoard() {
+  <span class="k">const</span> b = Object.create(BoardProto);   <span class="c">// methods shared on the prototype</span>
+  b.shapes = []; <span class="k">return</span> b;
+}</code></pre>
+      <p>The mechanism classes are built on. Rarely hand-written today, but worth understanding: methods live once on the prototype (memory-friendly), and it's the basis of composition below.</p>
+
+      <h3>6 · Composition over inheritance (mixins)</h3>
+      <pre><code><span class="c">// each mixin adds one capability; compose the ones you want</span>
+<span class="k">const</span> withEvents  = (o) =&gt; Object.assign(o, { on() {}, off() {}, emit() {} });
+<span class="k">const</span> withHistory = (o) =&gt; Object.assign(o, { undo() {}, redo() {} });
+
+<span class="k">const</span> board = withHistory(withEvents(createCore(canvas)));</code></pre>
+      <p>Instead of a deep class tree (<code>Board extends Interactive extends Drawable…</code>), assemble capabilities à la carte. This scales best for a feature-rich component — features become opt-in pieces rather than rigid hierarchy.</p>
+
+      <h3>7 · Extend <code>EventTarget</code> (platform pub-sub)</h3>
+      <pre><code><span class="k">class</span> DrawBoard <span class="k">extends</span> EventTarget {
+  add(s) {
+    <span class="c">/* … */</span>
+    this.dispatchEvent(<span class="k">new</span> CustomEvent('change', { detail: { shape: s } }));
+  }
+}
+board.addEventListener('change', (e) =&gt; console.log(e.detail.shape));</code></pre>
+      <p>Inherit the browser's own event machinery — consumers use the same <code>addEventListener</code> they already know. Data rides in <code>event.detail</code>.</p>
+
+      <h3>8 · Plugin architecture</h3>
+      <pre><code><span class="k">const</span> board = <span class="k">new</span> DrawBoard(canvas);
+board.use(GridPlugin).use(SnapPlugin, { grid: 8 });
+
+<span class="c">// a plugin is just an installer</span>
+<span class="k">const</span> GridPlugin = { install(board, opts) { <span class="c">/* extend board here */</span> } };</code></pre>
+      <p>Keep the core tiny and ship features as plugins users opt into. Best for bundle size and third-party extensibility.</p>
+
+      <h3>Which to choose</h3>
+      <table>
+        <tr><th>Approach</th><th>Privacy</th><th><code>this</code>?</th><th>Many instances</th><th>Best for</th></tr>
+        <tr><td>ES Class</td><td><code>#</code> fields</td><td>yes</td><td>yes</td><td>The default — discoverable, extensible</td></tr>
+        <tr><td>Factory + closures</td><td>closure</td><td>no</td><td>yes</td><td>Functional style, airtight privacy</td></tr>
+        <tr><td>Module / IIFE</td><td>closure</td><td>no</td><td>no (singleton)</td><td>Registries, global builds</td></tr>
+        <tr><td>Web Component</td><td><code>#</code> + shadow</td><td>yes</td><td>yes</td><td>Framework-agnostic drop-in</td></tr>
+        <tr><td>Prototype</td><td>none</td><td>yes</td><td>yes</td><td>Memory-tight, low-level</td></tr>
+        <tr><td>Mixins</td><td>varies</td><td>varies</td><td>yes</td><td>Feature-rich, opt-in capabilities</td></tr>
+        <tr><td>EventTarget</td><td><code>#</code> fields</td><td>yes</td><td>yes</td><td>Platform-native events</td></tr>
+        <tr><td>Plugins</td><td>core-defined</td><td>varies</td><td>yes</td><td>Tiny core + ecosystem</td></tr>
+      </table>
+      <h3>See the approaches run</h3>
+      <p>Four of the patterns above as tiny working components — each with its real source one click away. The class instance has a lifecycle you can <code>start</code>/<code>stop</code>/<code>destroy</code>; the factory hides its count in a closure; the emitter shows subscribe/emit/unsubscribe; the plugin extends a bare core at runtime.</p>
+      <div class="demo-grid">
+        <div class="demo" data-demo="classDemo">
+          <div class="demo-head"><span class="label">1 · class instance</span></div>
+          <div class="demo-body">
+            <canvas id="classCanvas" height="150"></canvas>
+            <div class="controls">
+              <button class="btn primary" id="classStart">start()</button>
+              <button class="btn" id="classStop">stop()</button>
+              <button class="btn" id="classDestroy">destroy()</button>
+            </div>
+            <div class="out" id="classOut">—</div>
+          </div>
+        </div>
+        <details class="src"><summary>View source &mdash; class instance</summary><pre><code>safe('classDemo', function(){
+    var canvas=document.getElementById('classCanvas'); if(!canvas) return;
+    var out=document.getElementById('classOut');
+    // A self-contained component authored as a class (constructor function here for ES5).
+    function Pulse(view){ this.v=view; this.t=0; this.alive=true; this.running=false; }
+    Pulse.prototype.start=function(){
+      if(this.running)return; this.running=true; this.last=performance.now(); var self=this;
+      (function loop(now){ if(!self.running||!self.alive)return; self.update((now-self.last)/1000); self.last=now; self.raf=requestAnimationFrame(loop); })(performance.now());
+    };
+    Pulse.prototype.stop=function(){ this.running=false; cancelAnimationFrame(this.raf); };
+    Pulse.prototype.update=function(dt){ if(!reduce) this.t+=dt; this.draw(); };
+    Pulse.prototype.draw=function(){
+      var c=this.v.ctx,W=this.v.w,H=this.v.h; c.clearRect(0,0,W,H);
+      var r=20+12*Math.abs(Math.sin(this.t*2));
+      c.globalAlpha=0.9; c.fillStyle='#2B44E0'; c.beginPath(); c.arc(W/2,H/2,r,0,Math.PI*2); c.fill(); c.globalAlpha=1;
+      c.fillStyle='#5C616B'; c.font='12px ui-monospace,monospace'; c.fillText('Pulse instance \u00B7 running='+this.running, 12, H-12);
+    };
+    Pulse.prototype.destroy=function(){ this.stop(); this.alive=false; this.v.ctx.clearRect(0,0,this.v.w,this.v.h); };
+    var v=makeView(canvas), inst=null;
+    function say(t){ if(out) out.textContent=t; }
+    function bind(id,fn){ var el=document.getElementById(id); if(el) el.addEventListener('click',fn); }
+    function ensure(){ if(!inst||!inst.alive){ inst=new Pulse(v); say('new Pulse(host) created'); } }
+    bind('classStart', function(){ v.refit(); ensure(); inst.start(); say('instance.start()'); });
+    bind('classStop', function(){ if(inst){ inst.stop(); say('instance.stop()'); } });
+    bind('classDestroy', function(){ if(inst){ inst.destroy(); inst=null; say('instance.destroy() \u2014 state gone'); } });
+    whenVisible(canvas, function(){ v.refit(); ensure(); inst.draw(); }, function(){ if(inst) inst.stop(); });
+  });</code></pre></details>
+        <div class="demo" data-demo="factoryDemo">
+          <div class="demo-head"><span class="label">2 · factory + closure</span></div>
+          <div class="demo-body">
+            <canvas id="factoryCanvas" height="150"></canvas>
+            <div class="controls">
+              <button class="btn primary" id="factoryIncrement">increment()</button>
+              <button class="btn" id="factoryReset">reset()</button>
+            </div>
+            <div class="out" id="factoryOut">—</div>
+          </div>
+        </div>
+        <details class="src"><summary>View source &mdash; factory + closure</summary><pre><code>safe('factoryDemo', function(){
+    var canvas=document.getElementById('factoryCanvas'); if(!canvas) return;
+    var out=document.getElementById('factoryOut');
+    var v=makeView(canvas);
+    // Factory + closure: `count` is private; only the returned API can touch it.
+    function createCounter(view){
+      var count=0;                                  // private — unreachable from outside
+      function render(){
+        var c=view.ctx,W=view.w,H=view.h; c.clearRect(0,0,W,H);
+        c.fillStyle='#16181D'; c.font='600 44px system-ui,sans-serif'; c.textAlign='center';
+        c.fillText(String(count), W/2, H/2+15); c.textAlign='left';
+        c.fillStyle='#5C616B'; c.font='12px ui-monospace,monospace'; c.fillText('private count via closure', 12, H-12);
+      }
+      return { increment:function(){ count++; render(); return count; },
+               reset:function(){ count=0; render(); },
+               get:function(){ return count; }, render:render };
+    }
+    var api=createCounter(v);
+    function bind(id,fn){ var el=document.getElementById(id); if(el) el.addEventListener('click',fn); }
+    bind('factoryIncrement', function(){ var n=api.increment(); if(out) out.textContent='api.increment() -&gt; '+n; });
+    bind('factoryReset', function(){ api.reset(); if(out) out.textContent='api.reset() -&gt; 0'; });
+    whenVisible(canvas, function(){ v.refit(); api.render(); }, function(){});
+  });</code></pre></details>
+        <div class="demo" data-demo="eventDemo">
+          <div class="demo-head"><span class="label">7 · event emitter</span></div>
+          <div class="demo-body">
+            <div class="log" id="eventOut" aria-live="polite" style="min-height:150px"></div>
+            <div class="controls">
+              <button class="btn primary" id="eventSubscribe">on()</button>
+              <button class="btn" id="eventEmit">emit()</button>
+              <button class="btn" id="eventUnsubscribe">off()</button>
+            </div>
+          </div>
+        </div>
+        <details class="src"><summary>View source &mdash; event emitter</summary><pre><code>safe('eventDemo', function(){
+    var out=document.getElementById('eventOut'); if(!out) return;
+    function Emitter(){ this.map={}; }
+    Emitter.prototype.on=function(t,fn){ (this.map[t]||(this.map[t]=[])).push(fn); return this; };
+    Emitter.prototype.off=function(t,fn){ var a=this.map[t]; if(a){ var i=a.indexOf(fn); if(i&gt;=0)a.splice(i,1); } return this; };
+    Emitter.prototype.emit=function(t,p){ (this.map[t]||[]).slice().forEach(function(fn){ fn(p); }); return this; };
+    var bus=new Emitter(), n=0;
+    function log(line){ var d=document.createElement('div'); d.className='ev'; d.textContent=line; out.appendChild(d); out.scrollTop=out.scrollHeight; while(out.children.length&gt;40) out.removeChild(out.firstChild); }
+    function handler(p){ log('   handler received: '+JSON.stringify(p)); }
+    function bind(id,fn){ var el=document.getElementById(id); if(el) el.addEventListener('click',fn); }
+    bind('eventSubscribe',   function(){ bus.on('change', handler); log("bus.on('change', handler)"); });
+    bind('eventEmit',        function(){ n++; log("bus.emit('change', { n:"+n+" })"); bus.emit('change',{n:n}); });
+    bind('eventUnsubscribe', function(){ bus.off('change', handler); log("bus.off('change', handler)"); });
+    log('emitter ready');
+  });</code></pre></details>
+        <div class="demo" data-demo="pluginDemo">
+          <div class="demo-head"><span class="label">8 · plugin system</span></div>
+          <div class="demo-body">
+            <canvas id="pluginCanvas" height="150"></canvas>
+            <div class="controls">
+              <button class="btn primary" id="pluginAddBox">addBox()</button>
+              <button class="btn" id="pluginToggle">toggle grid plugin</button>
+            </div>
+            <div class="out" id="pluginOut">—</div>
+          </div>
+        </div>
+        <details class="src"><summary>View source &mdash; plugin system</summary><pre><code>safe('pluginDemo', function(){
+    var canvas=document.getElementById('pluginCanvas'); if(!canvas) return;
+    var out=document.getElementById('pluginOut');
+    var v=makeView(canvas);
+    // Tiny core + opt-in plugins. A plugin is just { install(board) }.
+    function Board(view){ this.v=view; this.boxes=[]; this.plugins=[]; this.gridOn=false; }
+    Board.prototype.use=function(p){ this.plugins.push(p); p.install(this); return this; };
+    Board.prototype.addBox=function(){ this.boxes.push({ x:Math.random()*(this.v.w-40)+4, y:Math.random()*(this.v.h-40)+4 }); this.render(); };
+    Board.prototype.render=function(){
+      var c=this.v.ctx,W=this.v.w,H=this.v.h; c.clearRect(0,0,W,H);
+      if(this.gridOn){ c.strokeStyle='rgba(43,68,224,0.18)'; c.lineWidth=1;
+        for(var gx=0;gx&lt;W;gx+=20){c.beginPath();c.moveTo(gx,0);c.lineTo(gx,H);c.stroke();}
+        for(var gy=0;gy&lt;H;gy+=20){c.beginPath();c.moveTo(0,gy);c.lineTo(W,gy);c.stroke();} }
+      c.fillStyle='#2B44E0'; this.boxes.forEach(function(b){ c.fillRect(b.x,b.y,30,30); });
+      c.fillStyle='#5C616B'; c.font='12px ui-monospace,monospace'; c.fillText('plugins: '+this.plugins.length+(this.gridOn?' \u00B7 grid ON':''), 12, H-12);
+    };
+    var GridPlugin={ name:'grid', install:function(board){ board.toggleGrid=function(){ board.gridOn=!board.gridOn; board.render(); }; } };
+    var board=new Board(v).use(GridPlugin);
+    function bind(id,fn){ var el=document.getElementById(id); if(el) el.addEventListener('click',fn); }
+    bind('pluginAddBox', function(){ board.addBox(); if(out) out.textContent='board.addBox()  (core feature)'; });
+    bind('pluginToggle', function(){ board.toggleGrid(); if(out) out.textContent='GridPlugin.install added toggleGrid() -&gt; '+(board.gridOn?'on':'off'); });
+    whenVisible(canvas, function(){ v.refit(); board.render(); }, function(){});
+  });</code></pre></details>
+      </div>
+
+      <div class="callout tip"><span class="tag">Recommended blend</span><p>For this board: a <strong>class core</strong> (extending <code>EventTarget</code> for events), <strong>composition/mixins</strong> for optional features like history and snapping, and a thin <strong>Custom Element</strong> wrapper for HTML ergonomics. Prefer a factory instead of the class if you'd rather avoid <code>this</code> entirely.</p></div>
+    </section>
+
+    <!-- 03 NEW -->
+    <section id="modules">
+      <span class="sec-num">SECTION 03</span>
+      <h2>Module systems &amp; build outputs</h2>
+      <p>How you <em>author</em> and <em>publish</em> decides who can consume you. Author in ESM, then emit several formats from that one source.</p>
+      <ul>
+        <li><strong>ESM</strong> — <code>import</code>/<code>export</code>; statically analyzable, so bundlers can tree-shake. The modern default and what you write.</li>
+        <li><strong>CommonJS (CJS)</strong> — <code>require</code>/<code>module.exports</code>; older Node and some tooling.</li>
+        <li><strong>UMD</strong> — one bundle that works as a global, CJS, or AMD; friendly to CDNs and <code>&lt;script&gt;</code>.</li>
+        <li><strong>IIFE / global</strong> — a single script that hangs <code>window.DrawBoard</code>; the simplest drop-in for a plain HTML page.</li>
+      </ul>
+      <pre class="filename">package.json — point each consumer at the right build</pre>
+      <pre><code>{
+  "name": "draw-board",
+  "type": "module",
+  "exports": {
+    ".": {
+      "import": "./dist/draw-board.js",     <span class="c">// ESM consumers</span>
+      "require": "./dist/draw-board.cjs"     <span class="c">// CJS consumers</span>
+    }
+  },
+  "unpkg": "./dist/draw-board.umd.js",        <span class="c">// CDN &lt;script&gt; tag</span>
+  "types": "./dist/index.d.ts",               <span class="c">// editor autocomplete</span>
+  "sideEffects": false                        <span class="c">// safe to tree-shake</span>
+}</code></pre>
+      <div class="callout tip"><span class="tag">Authoring rules for tree-shaking</span><p>Prefer <strong>named exports</strong> over a single default object, keep the module body free of top-level side effects, and split optional features (extra shapes, tools) into their own modules so unused code can be dropped. Ship source maps.</p></div>
+    </section>
+
+    <!-- 04 -->
+    <section id="skeleton">
+      <span class="sec-num">SECTION 04</span>
+      <h2>Project skeleton</h2>
+      <pre><code>draw-board/
+├── src/
+│   ├── core/
+│   │   ├── Board.js        <span class="c">// engine: orchestrates everything</span>
+│   │   ├── Renderer.js     <span class="c">// draws a scene to a context</span>
+│   │   ├── Scene.js        <span class="c">// shapes, z-order, hit-testing</span>
+│   │   ├── Camera.js       <span class="c">// pan / zoom transform</span>
+│   │   └── Ticker.js       <span class="c">// rAF loop with delta time</span>
+│   ├── shapes/             <span class="c">// Shape base + Rect, Ellipse, Sprite, FreehandPath…</span>
+│   ├── input/{PointerInput.js, KeyboardInput.js}
+│   ├── anim/{Tween.js, easings.js, SpriteClip.js}
+│   ├── assets/Loader.js    <span class="c">// preload + decode images</span>
+│   ├── history/History.js  <span class="c">// undo / redo</span>
+│   ├── plugins/            <span class="c">// opt-in features (grid, snap…)</span>
+│   ├── DrawBoardElement.js <span class="c">// the &lt;draw-board&gt; wrapper</span>
+│   └── index.js            <span class="c">// the public API surface</span>
+└── package.json</code></pre>
+      <p>Keep modules small and single-purpose. <code>index.js</code> re-exports only what users should touch.</p>
+    </section>
+
+    <!-- 05 -->
+    <section id="setup">
+      <span class="sec-num">SECTION 05</span>
+      <h2>Canvas setup everyone gets wrong</h2>
+      <p>A canvas has two sizes: its CSS size and its backing-store size. Ignore <code>devicePixelRatio</code> and everything is fuzzy on modern screens. See it:</p>
+      <div class="demo" data-demo="dpr">
+        <div class="demo-head"><span class="label">device pixel ratio</span></div>
+        <div class="demo-body">
+          <div class="swatch-row">
+            <figure><canvas id="dprNaive" height="160"></canvas><figcaption>naive (blurry)</figcaption></figure>
+            <figure><canvas id="dprCrisp" height="160"></canvas><figcaption>DPR-aware (crisp)</figcaption></figure>
+          </div>
+          <div class="controls"><span class="readout">your screen: <b id="dprVal">—</b></span></div>
+        </div>
+      </div>
+        <details class="src"><summary>View source &mdash; device-pixel-ratio</summary><pre><code>safe('dpr', function(){
+    var nv=document.getElementById('dprNaive'), cr=document.getElementById('dprCrisp'); if(!nv||!cr) return;
+    var dval=document.getElementById('dprVal'); if(dval) dval.textContent=(window.devicePixelRatio||1).toFixed(2)+'\u00D7';
+    function widthOf(c){ var r=c.getBoundingClientRect(); return Math.round(r.width)||c.clientWidth||(c.parentElement?c.parentElement.clientWidth:0)||260; }
+    function draw(x,w,h){
+      x.clearRect(0,0,w,h);
+      x.fillStyle='#16181D'; x.font='600 15px system-ui, sans-serif'; x.fillText('Crisp text &amp; lines', 14, 26);
+      x.strokeStyle='#2B44E0'; x.lineWidth=1;
+      for(var i=0;i&lt;6;i++){ x.beginPath(); x.moveTo(14, 42+i*6.5+0.5); x.lineTo(w-14, 42+i*6.5+0.5); x.stroke(); }
+      x.beginPath(); x.arc(w-34, h-32, 20, 0, Math.PI*2); x.fillStyle='#ff5577'; x.fill();
+    }
+    function go(){
+      var h=160;
+      var w1=widthOf(nv); nv.style.height=h+'px'; nv.width=Math.max(1,w1); nv.height=h; draw(nv.getContext('2d'),w1,h);
+      var w2=widthOf(cr); cr.style.height=h+'px'; cr.width=Math.max(1,Math.round(w2*DPR)); cr.height=Math.round(h*DPR);
+      var x=cr.getContext('2d'); x.setTransform(DPR,0,0,DPR,0,0); draw(x,w2,h);
+    }
+    nv.__resize=go;   // picked up by the global resize handler below
+    whenVisible(nv, go, function(){});
+  });</code></pre></details>
+      <pre><code><span class="k">function</span> resizeCanvas(canvas, ctx, cssW, cssH) {
+  <span class="k">const</span> dpr = window.devicePixelRatio || 1;
+  canvas.width  = Math.round(cssW * dpr);
+  canvas.height = Math.round(cssH * dpr);
+  canvas.style.width  = cssW + 'px';
+  canvas.style.height = cssH + 'px';
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0); <span class="c">// now draw in CSS pixels</span>
+}</code></pre>
+      <pre><code><span class="k">const</span> ro = <span class="k">new</span> ResizeObserver(([entry]) =&gt; {
+  <span class="k">const</span> { width, height } = entry.contentRect;
+  resizeCanvas(canvas, ctx, width, height);
+  board.requestRender();
+});
+ro.observe(container); <span class="c">// ro.disconnect() in destroy()</span></code></pre>
+      <div class="callout warn"><span class="tag">Gotcha</span><p>Setting <code>canvas.width</code> resets the entire context state (transforms, styles). Always re-apply <code>setTransform</code> after a resize, then redraw.</p></div>
+    </section>
+
+    <!-- 06 -->
+    <section id="coords">
+      <span class="sec-num">SECTION 06</span>
+      <h2>Coordinates, transforms &amp; a camera</h2>
+      <p>A real board needs pan and zoom. The clean way is a <strong>camera</strong>: one transform applied before drawing the scene, plus its inverse to turn pointer coordinates back into world space.</p>
+      <pre><code><span class="k">class</span> Camera {
+  x = 0; y = 0; zoom = 1;
+  apply(ctx) {                       <span class="c">// screen = world * zoom + offset</span>
+    ctx.translate(this.x, this.y);
+    ctx.scale(this.zoom, this.zoom);
+  }
+  toWorld(sx, sy) {                  <span class="c">// invert it for hit-testing</span>
+    <span class="k">return</span> { x: (sx - this.x) / this.zoom,
+             y: (sy - this.y) / this.zoom };
+  }
+}</code></pre>
+      <p>Each frame: <code>ctx.save()</code> → <code>camera.apply(ctx)</code> → draw scene → <code>ctx.restore()</code>. To zoom toward the cursor, convert the cursor to world space <em>before</em> changing zoom, then nudge <code>camera.x/y</code> so the same world point lands under the cursor again.</p>
+      <div class="callout tip"><span class="tag">Trick</span><p>Wrap every shape's drawing in <code>ctx.save()</code> / <code>ctx.restore()</code> — it isolates style and transform changes so one shape can't leak state into the next.</p></div>
+    </section>
+
+    <!-- 07 -->
+    <section id="loop">
+      <span class="sec-num">SECTION 07</span>
+      <h2>The render loop — the heart</h2>
+      <p>Use a single <code>requestAnimationFrame</code> loop and pass <strong>delta time</strong> to everything, so motion is independent of frame rate. Pause and resume the ball — its speed stays honest regardless of stutter.</p>
+      <div class="demo" data-demo="loop">
+        <div class="demo-head"><span class="label">rAF + delta time</span></div>
+        <div class="demo-body">
+          <canvas id="loopCanvas" height="180"></canvas>
+          <div class="controls">
+            <button class="btn primary" id="loopToggle">Pause</button>
+            <label class="lbl"><input type="checkbox" id="loopRender" checked> render only when dirty</label>
+            <span class="readout"><b id="loopFps">0</b> fps · <b id="loopFrames">0</b> draws</span>
+          </div>
+        </div>
+      </div>
+        <details class="src"><summary>View source &mdash; render loop</summary><pre><code>safe('loop', function(){
+    var canvas=document.getElementById('loopCanvas'); if(!canvas) return;
+    var v=makeView(canvas);
+    var ball={x:v.w/2,y:v.h/2,vx:150,vy:110,r:16}, on=true, dirtyOnly=false, dirty=true, raf, last=0, running=false;
+    var fpsEl=document.getElementById('loopFps'), frEl=document.getElementById('loopFrames'), frames=0, acc=0, fc=0;
+    var btn=document.getElementById('loopToggle');
+    if(btn) btn.addEventListener('click',function(){ on=!on; this.textContent=on?'Pause':'Resume'; if(on&amp;&amp;running){last=performance.now();raf=requestAnimationFrame(frame);} });
+    var chk=document.getElementById('loopRender'); if(chk) chk.addEventListener('change',function(){ dirtyOnly=!this.checked; });
+    v.onResize=function(){ dirty=true; };
+    function frame(now){
+      if(!running||!on) return;
+      var dt=Math.min((now-last)/1000,0.05); last=now;
+      var ctx=v.ctx, W=v.w, H=v.h;
+      acc+=dt; fc++; if(acc&gt;=0.5){ if(fpsEl)fpsEl.textContent=Math.round(fc/acc); acc=0; fc=0; }
+      var moved=false;
+      if(!reduce){
+        ball.x+=ball.vx*dt; ball.y+=ball.vy*dt; moved=true;
+        if(ball.x&lt;ball.r||ball.x&gt;W-ball.r){ball.vx*=-1;ball.x=Math.max(ball.r,Math.min(W-ball.r,ball.x));}
+        if(ball.y&lt;ball.r||ball.y&gt;H-ball.r){ball.vy*=-1;ball.y=Math.max(ball.r,Math.min(H-ball.r,ball.y));}
+      }
+      if(moved) dirty=true;
+      if(!dirtyOnly || dirty){
+        ctx.clearRect(0,0,W,H); ctx.fillStyle='rgba(43,68,224,0.08)'; ctx.fillRect(0,0,W,H);
+        ctx.beginPath(); ctx.arc(ball.x,ball.y,ball.r,0,Math.PI*2); ctx.fillStyle='#2B44E0'; ctx.fill();
+        frames++; if(frEl)frEl.textContent=frames; dirty=false;
+      }
+      raf=requestAnimationFrame(frame);
+    }
+    whenVisible(canvas,
+      function(){ if(running)return; v.refit(); running=true; dirty=true; last=performance.now(); if(on)raf=requestAnimationFrame(frame); },
+      function(){ running=false; cancelAnimationFrame(raf); });
+  });</code></pre></details>
+      <pre class="filename">core/Ticker.js</pre>
+      <pre><code><span class="k">export class</span> Ticker {
+  constructor(onTick) { this.onTick = onTick; this._on = <span class="k">false</span>; }
+  start() {
+    <span class="k">if</span> (this._on) <span class="k">return</span>;
+    this._on = <span class="k">true</span>; this._last = performance.now();
+    <span class="k">const</span> loop = (now) =&gt; {
+      <span class="k">if</span> (!this._on) <span class="k">return</span>;
+      <span class="k">const</span> dt = (now - this._last) / 1000;   <span class="c">// seconds</span>
+      this._last = now;
+      this.onTick(dt);
+      this._raf = requestAnimationFrame(loop);
+    };
+    this._raf = requestAnimationFrame(loop);
+  }
+  stop() { this._on = <span class="k">false</span>; cancelAnimationFrame(this._raf); }
+}</code></pre>
+      <div class="callout tip"><span class="tag">Render on demand</span><p>Keep a <code>dirty</code> flag and only paint when something changed or an animation is active. Toggle it above — the draw count freezes while nothing moves.</p></div>
+    </section>
+
+    <!-- 08 -->
+    <section id="shapes">
+      <span class="sec-num">SECTION 08</span>
+      <h2>Shapes &amp; hit-testing</h2>
+      <p>Each shape knows how to draw itself and how to test a point. The scene draws back-to-front but hit-tests front-to-back, so the <em>topmost</em> shape wins the click:</p>
+      <div class="demo" data-demo="hit">
+        <div class="demo-head"><span class="label">z-order hit testing</span></div>
+        <div class="demo-body">
+          <canvas id="hitCanvas" height="200"></canvas>
+          <div class="controls"><span class="readout">selected: <b id="hitSel">none</b></span></div>
+        </div>
+      </div>
+        <details class="src"><summary>View source &mdash; hit testing</summary><pre><code>safe('hit', function(){
+    var canvas=document.getElementById('hitCanvas'); if(!canvas) return;
+    var v=makeView(canvas);
+    var sel=document.getElementById('hitSel');
+    var rects=[{id:'A',x:40,y:40,w:130,h:90,c:'#2B44E0'},{id:'B',x:120,y:80,w:130,h:90,c:'#ff5577'},{id:'C',x:200,y:50,w:130,h:90,c:'#37b88f'}], selected=null;
+    function draw(){
+      var ctx=v.ctx; ctx.clearRect(0,0,v.w,v.h);
+      rects.forEach(function(r){
+        ctx.save(); ctx.globalAlpha=0.9; ctx.fillStyle=r.c; ctx.fillRect(r.x,r.y,r.w,r.h);
+        if(selected===r){ ctx.lineWidth=3; ctx.strokeStyle='#16181D'; ctx.strokeRect(r.x-1.5,r.y-1.5,r.w+3,r.h+3); }
+        ctx.fillStyle='#fff'; ctx.font='600 16px system-ui,sans-serif'; ctx.fillText(r.id, r.x+10, r.y+24); ctx.restore();
+      });
+    }
+    canvas.addEventListener('pointerdown',function(e){
+      var b=canvas.getBoundingClientRect(), px=e.clientX-b.left, py=e.clientY-b.top; selected=null;
+      for(var i=rects.length-1;i&gt;=0;i--){ var r=rects[i]; if(px&gt;=r.x&amp;&amp;px&lt;=r.x+r.w&amp;&amp;py&gt;=r.y&amp;&amp;py&lt;=r.y+r.h){ selected=r; break; } }
+      if(sel) sel.textContent=selected?selected.id+' (top of stack)':'none'; draw();
+    });
+    v.onResize=draw;
+    whenVisible(canvas, function(){ v.refit(); draw(); }, function(){});
+  });</code></pre></details>
+      <pre class="filename">shapes/Rect.js</pre>
+      <pre><code><span class="k">class</span> Rect <span class="k">extends</span> Shape {
+  draw(ctx) {
+    ctx.save();
+    ctx.fillStyle = this.style.fill ?? '#4f8cff';
+    ctx.fillRect(this.x, this.y, this.w, this.h);
+    ctx.restore();
+  }
+  hitTest(px, py) {
+    <span class="k">return</span> px &gt;= this.x &amp;&amp; px &lt;= this.x + this.w &amp;&amp;
+           py &gt;= this.y &amp;&amp; py &lt;= this.y + this.h;
+  }
+}</code></pre>
+      <div class="callout tip"><span class="tag">Trick</span><p>For irregular shapes, skip the math — build the path and ask the canvas: <code>ctx.beginPath(); shape.tracePath(ctx); return ctx.isPointInPath(px, py);</code></p></div>
+    </section>
+
+    <!-- 09 -->
+    <section id="input">
+      <span class="sec-num">SECTION 09</span>
+      <h2>Pointer input</h2>
+      <p>Pointer Events unify mouse, touch and pen. The pad below uses pointer capture so a stroke keeps tracking even when you drag outside the box:</p>
+      <div class="demo" data-demo="draw">
+        <div class="demo-head"><span class="label">freehand · pointer capture</span></div>
+        <div class="demo-body">
+          <canvas id="drawCanvas" height="200" aria-label="Drawing pad: drag to draw"></canvas>
+          <div class="controls">
+            <button class="btn" id="drawClear">Clear</button>
+            <label class="lbl">stroke <input type="range" id="drawWidth" min="1" max="18" value="4"></label>
+            <span class="readout"><b id="drawPts">0</b> points</span>
+          </div>
+        </div>
+      </div>
+        <details class="src"><summary>View source &mdash; freehand pointer</summary><pre><code>safe('draw', function(){
+    var canvas=document.getElementById('drawCanvas'); if(!canvas) return;
+    var v=makeView(canvas);
+    var strokes=[], cur=null, width=4, ptsEl=document.getElementById('drawPts');
+    function redraw(){
+      var ctx=v.ctx; ctx.clearRect(0,0,v.w,v.h); ctx.fillStyle='#fff'; ctx.fillRect(0,0,v.w,v.h);
+      strokes.forEach(function(s){
+        if(s.pts.length&lt;2)return;
+        ctx.save(); ctx.strokeStyle='#16181D'; ctx.lineWidth=s.w; ctx.lineJoin='round'; ctx.lineCap='round';
+        ctx.beginPath(); ctx.moveTo(s.pts[0].x,s.pts[0].y);
+        for(var i=1;i&lt;s.pts.length;i++) ctx.lineTo(s.pts[i].x,s.pts[i].y);
+        ctx.stroke(); ctx.restore();
+      });
+      var n=0; strokes.forEach(function(s){n+=s.pts.length;}); if(ptsEl)ptsEl.textContent=n;
+    }
+    function loc(e){ var b=canvas.getBoundingClientRect(); return {x:e.clientX-b.left,y:e.clientY-b.top}; }
+    canvas.addEventListener('pointerdown',function(e){ canvas.setPointerCapture(e.pointerId); cur={w:width,pts:[loc(e)]}; strokes.push(cur); });
+    canvas.addEventListener('pointermove',function(e){ if(!cur)return; cur.pts.push(loc(e)); redraw(); });
+    window.addEventListener('pointerup',function(){ cur=null; });
+    var rng=document.getElementById('drawWidth'); if(rng) rng.addEventListener('input',function(){ width=+this.value; });
+    var clr=document.getElementById('drawClear'); if(clr) clr.addEventListener('click',function(){ strokes=[]; redraw(); });
+    v.onResize=redraw;
+    whenVisible(canvas, function(){ v.refit(); redraw(); }, function(){});
+  });</code></pre></details>
+      <pre><code>canvas.addEventListener('pointerdown', (e) =&gt; {
+  canvas.setPointerCapture(e.pointerId);   <span class="c">// keep moves outside the canvas</span>
+  <span class="k">const</span> r = canvas.getBoundingClientRect();
+  <span class="k">const</span> p = { x: e.clientX - r.left, y: e.clientY - r.top };
+  board.emit('pointerdown', { ...p, originalEvent: e });
+});</code></pre>
+      <ul>
+        <li><code>getBoundingClientRect()</code> converts screen → canvas-local (then feed through <code>camera.toWorld</code> if you pan/zoom).</li>
+        <li><code>setPointerCapture</code> makes drags smooth past the edge.</li>
+        <li><code>touch-action:none</code> in CSS stops the browser scrolling while drawing.</li>
+        <li><code>lineJoin = 'round'</code> + <code>lineCap = 'round'</code> for natural strokes.</li>
+      </ul>
+    </section>
+
+    <!-- 10 -->
+    <section id="keys">
+      <span class="sec-num">SECTION 10</span>
+      <h2>Mouse &amp; keyboard input</h2>
+      <p>Pointer events cover drawing; an app-like board also wants keyboard control, modifier keys, the wheel, and right-click. Click the canvas to focus it, then move the square with <strong>WASD</strong> or the <strong>arrow keys</strong> — and drag it with the mouse. Watch the held-key set light up:</p>
+      <div class="demo" data-demo="keys">
+        <div class="demo-head"><span class="label">keyboard + mouse</span></div>
+        <div class="demo-body">
+          <canvas id="keysCanvas" height="220" tabindex="0" aria-label="Move the square with WASD or arrow keys, or drag it with the mouse"></canvas>
+          <div class="controls">
+            <div class="keys-vis" id="keysVis" aria-hidden="true">
+              <span class="keycap" data-k="w">W</span>
+              <span class="keycap" data-k="a">A</span>
+              <span class="keycap" data-k="s">S</span>
+              <span class="keycap" data-k="d">D</span>
+              <span class="keycap" data-k="shift">⇧ run</span>
+            </div>
+            <span class="readout">x <b id="keysX">0</b> · y <b id="keysY">0</b></span>
+          </div>
+        </div>
+      </div>
+        <details class="src"><summary>View source &mdash; mouse + keyboard</summary><pre><code>safe('keys', function(){
+    var canvas=document.getElementById('keysCanvas'); if(!canvas) return;
+    var v=makeView(canvas);
+    var player={x:v.w/2-18,y:v.h/2-18,s:36}, keys={}, dragging=false, dx=0, dy=0, raf, last=0, running=false;
+    var xEl=document.getElementById('keysX'), yEl=document.getElementById('keysY');
+    var caps={}; var nodes=document.querySelectorAll('#keysVis .keycap');
+    for(var i=0;i&lt;nodes.length;i++){ caps[nodes[i].getAttribute('data-k')]=nodes[i]; }
+    function syncCaps(){ for(var k in caps){ if(keys[k]) caps[k].classList.add('on'); else caps[k].classList.remove('on'); } }
+    function has(k){ return !!keys[k]; }
+    canvas.addEventListener('keydown',function(e){
+      var k=e.key.toLowerCase(); keys[k]=true;
+      if(['arrowup','arrowdown','arrowleft','arrowright',' '].indexOf(k)&gt;=0) e.preventDefault();
+      syncCaps();
+    });
+    canvas.addEventListener('keyup',function(e){ keys[e.key.toLowerCase()]=false; syncCaps(); });
+    window.addEventListener('blur',function(){ keys={}; syncCaps(); });
+    function loc(e){ var b=canvas.getBoundingClientRect(); return {x:e.clientX-b.left,y:e.clientY-b.top}; }
+    canvas.addEventListener('pointerdown',function(e){
+      canvas.focus(); var p=loc(e);
+      if(p.x&gt;=player.x&amp;&amp;p.x&lt;=player.x+player.s&amp;&amp;p.y&gt;=player.y&amp;&amp;p.y&lt;=player.y+player.s){ dragging=true; dx=p.x-player.x; dy=p.y-player.y; canvas.setPointerCapture(e.pointerId); }
+    });
+    canvas.addEventListener('pointermove',function(e){ if(!dragging)return; var p=loc(e); player.x=p.x-dx; player.y=p.y-dy; });
+    window.addEventListener('pointerup',function(){ dragging=false; });
+    function frame(now){
+      if(!running) return;
+      var dt=Math.min((now-last)/1000,0.05); last=now;
+      var ctx=v.ctx, W=v.w, H=v.h, speed=has('shift')?460:220;
+      if(!dragging){
+        if(has('w')||has('arrowup'))    player.y-=speed*dt;
+        if(has('s')||has('arrowdown'))  player.y+=speed*dt;
+        if(has('a')||has('arrowleft'))  player.x-=speed*dt;
+        if(has('d')||has('arrowright')) player.x+=speed*dt;
+      }
+      player.x=Math.max(0,Math.min(W-player.s,player.x));
+      player.y=Math.max(0,Math.min(H-player.s,player.y));
+      ctx.clearRect(0,0,W,H);
+      ctx.strokeStyle='rgba(22,24,29,0.05)'; ctx.lineWidth=1;
+      for(var gx=0;gx&lt;W;gx+=22){ ctx.beginPath();ctx.moveTo(gx,0);ctx.lineTo(gx,H);ctx.stroke(); }
+      for(var gy=0;gy&lt;H;gy+=22){ ctx.beginPath();ctx.moveTo(0,gy);ctx.lineTo(W,gy);ctx.stroke(); }
+      var focused=(document.activeElement===canvas);
+      ctx.fillStyle = has('shift') ? '#ff5577' : '#2B44E0';
+      ctx.fillRect(player.x,player.y,player.s,player.s);
+      if(focused){ ctx.strokeStyle='#16181D'; ctx.lineWidth=2; ctx.strokeRect(player.x-3,player.y-3,player.s+6,player.s+6); }
+      ctx.fillStyle='#5C616B'; ctx.font='12px ui-monospace,monospace';
+      ctx.fillText(focused?'focused \u2014 use WASD / arrows / shift':'click to focus, then move', 12, H-12);
+      if(xEl)xEl.textContent=Math.round(player.x); if(yEl)yEl.textContent=Math.round(player.y);
+      raf=requestAnimationFrame(frame);
+    }
+    whenVisible(canvas,
+      function(){ if(running)return; v.refit(); running=true; last=performance.now(); raf=requestAnimationFrame(frame); },
+      function(){ running=false; cancelAnimationFrame(raf); });
+  });</code></pre></details>
+      <h3>Hold a set, read it in the loop</h3>
+      <p>Don't move on the <code>keydown</code> event — that ties motion to the OS key-repeat rate. Track <em>held</em> keys in a Set and apply them every frame scaled by <code>dt</code>, so movement is smooth and frame-rate independent.</p>
+      <pre><code><span class="k">const</span> keys = <span class="k">new</span> Set();
+canvas.tabIndex = 0;                          <span class="c">// a canvas must be focusable for keys</span>
+
+canvas.addEventListener('keydown', (e) =&gt; {
+  keys.add(e.key.toLowerCase());
+  <span class="k">if</span> (['arrowup','arrowdown','arrowleft','arrowright',' '].includes(e.key.toLowerCase()))
+    e.preventDefault();                       <span class="c">// stop the page from scrolling</span>
+  <span class="k">if</span> ((e.ctrlKey || e.metaKey) &amp;&amp; e.key === 'z') { e.preventDefault(); board.undo(); }
+});
+canvas.addEventListener('keyup', (e) =&gt; keys.delete(e.key.toLowerCase()));
+window.addEventListener('blur', () =&gt; keys.clear()); <span class="c">// avoid "stuck" keys</span>
+
+<span class="k">function</span> update(dt) {                          <span class="c">// called each tick</span>
+  <span class="k">const</span> speed = keys.has('shift') ? 460 : 220; <span class="c">// px / second</span>
+  <span class="k">if</span> (keys.has('w') || keys.has('arrowup'))    player.y -= speed * dt;
+  <span class="k">if</span> (keys.has('s') || keys.has('arrowdown'))  player.y += speed * dt;
+  <span class="k">if</span> (keys.has('a') || keys.has('arrowleft'))  player.x -= speed * dt;
+  <span class="k">if</span> (keys.has('d') || keys.has('arrowright')) player.x += speed * dt;
+}</code></pre>
+      <h3>Richer mouse: wheel, modifiers, right-click</h3>
+      <pre><code><span class="c">// wheel to zoom toward the cursor — passive:false lets us preventDefault</span>
+canvas.addEventListener('wheel', (e) =&gt; {
+  e.preventDefault();
+  <span class="k">const</span> factor = e.deltaY &lt; 0 ? 1.1 : 1 / 1.1;
+  board.zoomAt(e.offsetX, e.offsetY, factor);
+}, { passive: <span class="k">false</span> });
+
+canvas.addEventListener('dblclick', (e) =&gt; board.edit(board.pick(e.offsetX, e.offsetY)));
+canvas.addEventListener('contextmenu', (e) =&gt; { e.preventDefault(); board.showMenu(e); });
+
+<span class="c">// modifiers turn one drag into many gestures</span>
+<span class="k">function</span> onDrag(e) {
+  <span class="k">if</span> (e.shiftKey)        board.constrainToAxis();   <span class="c">// straight lines</span>
+  <span class="k">else if</span> (e.altKey)     board.duplicate();         <span class="c">// alt-drag = copy</span>
+  <span class="k">else if</span> (e.spaceHeld)  board.pan(e.movementX, e.movementY);
+}</code></pre>
+      <div class="callout tip"><span class="tag">Centralize shortcuts</span><p>Put keyboard shortcuts in one keymap (<code>{ 'mod+z': undo, 'mod+shift+z': redo, 'delete': removeSelected }</code>) instead of scattering <code>if</code>s. Use <code>e.metaKey || e.ctrlKey</code> as "mod" so one map works on macOS and Windows.</p></div>
+      <div class="callout warn"><span class="tag">Gotcha</span><p>Arrow keys, space and <code>Ctrl/Cmd+S</code> all have default browser behavior. Call <code>preventDefault()</code> on the keys you own, and clear your held-key Set on <code>window blur</code> or a key can get "stuck" after the user alt-tabs away mid-press.</p></div>
+    </section>
+
+    <!-- 11 -->
+    <section id="sprites">
+      <span class="sec-num">SECTION 11</span>
+      <h2>Rapidly changing images (PNG)</h2>
+      <p>For frame-based imagery — explosions, character cycles, pre-rendered effects — you swap images fast. The flipbook below plays <strong>24 real PNG frames generated in your browser</strong>: each one is encoded to an actual PNG, preloaded into an <code>Image</code>, then drawn in sequence. Drag the FPS slider to change playback speed.</p>
+      <div class="demo" data-demo="sprite">
+        <div class="demo-head"><span class="label">PNG flipbook · 24 frames</span></div>
+        <div class="demo-body">
+          <canvas id="spriteCanvas" height="200"></canvas>
+          <div class="controls">
+            <button class="btn primary" id="spritePlay">Pause</button>
+            <label class="lbl">fps <input type="range" id="spriteFps" min="2" max="30" value="12"></label>
+            <span class="readout">frame <b id="spriteFrame">0</b>/24 · <b id="spriteFpsVal">12</b> fps</span>
+          </div>
+        </div>
+      </div>
+        <details class="src"><summary>View source &mdash; PNG flipbook</summary><pre><code>safe('sprite', function(){
+    var canvas=document.getElementById('spriteCanvas'); if(!canvas) return;
+    var v=makeView(canvas);
+    var N=24, frames=[], ready=false, made=0, idx=0, acc=0, fps=12, playing=true, raf, last=0, running=false;
+    var fEl=document.getElementById('spriteFrame'), fpsValEl=document.getElementById('spriteFpsVal');
+    (function generate(){
+      var SIZE=120;
+      for(var i=0;i&lt;N;i++){
+        (function(i){
+          var off=document.createElement('canvas'); off.width=SIZE; off.height=SIZE;
+          var c=off.getContext('2d'); var t=i/N, ang=t*Math.PI*2;
+          c.clearRect(0,0,SIZE,SIZE); c.translate(SIZE/2,SIZE/2);
+          var dots=10;
+          for(var d=0;d&lt;dots;d++){
+            var a=ang + d/dots*Math.PI*2, rad=34+8*Math.sin(ang*2 + d);
+            var x=Math.cos(a)*rad, y=Math.sin(a)*rad, hue=Math.round((d/dots*360 + i*15)%360);
+            c.beginPath(); c.fillStyle='hsl('+hue+',70%,55%)'; c.arc(x,y,6+3*Math.cos(ang+d),0,Math.PI*2); c.fill();
+          }
+          c.beginPath(); c.fillStyle='#16181D'; c.arc(0,0,9+5*Math.abs(Math.sin(ang)),0,Math.PI*2); c.fill();
+          var img=new Image();
+          img.onload=function(){ made++; if(made===N) ready=true; };
+          try { img.src=off.toDataURL('image/png'); } catch(err){ ready=true; }
+          frames[i]=img;
+        })(i);
+      }
+    })();
+    var pb=document.getElementById('spritePlay'); if(pb) pb.addEventListener('click',function(){ playing=!playing; this.textContent=playing?'Pause':'Play \u25B8'; });
+    var fr=document.getElementById('spriteFps'); if(fr) fr.addEventListener('input',function(){ fps=+this.value; if(fpsValEl)fpsValEl.textContent=fps; });
+    function frame(now){
+      if(!running) return;
+      var dt=Math.min((now-last)/1000,0.05); last=now;
+      var ctx=v.ctx, W=v.w, H=v.h;
+      if(ready){
+        if(playing &amp;&amp; !reduce){ acc+=dt; var step=1/fps; while(acc&gt;=step){ acc-=step; idx=(idx+1)%N; } }
+        ctx.clearRect(0,0,W,H);
+        var img=frames[idx];
+        if(img &amp;&amp; img.width){ var size=Math.min(W,H)-20; ctx.drawImage(img,(W-size)/2,(H-size)/2,size,size); }
+        if(fEl)fEl.textContent=idx;
+      } else {
+        ctx.clearRect(0,0,W,H); ctx.fillStyle='#5C616B'; ctx.font='13px ui-monospace,monospace'; ctx.fillText('encoding 24 PNG frames\u2026', 14, H/2);
+      }
+      raf=requestAnimationFrame(frame);
+    }
+    whenVisible(canvas,
+      function(){ if(running)return; v.refit(); running=true; last=performance.now(); raf=requestAnimationFrame(frame); },
+      function(){ running=false; cancelAnimationFrame(raf); });
+  });</code></pre></details>
+      <h3>Two ways to hold frames</h3>
+      <table>
+        <tr><th>Approach</th><th>How</th><th>Best when</th></tr>
+        <tr><td><strong>Frame array</strong></td><td>N separate images; draw the current index each tick</td><td>A handful of large frames, or frames generated at runtime</td></tr>
+        <tr><td><strong>Sprite sheet</strong></td><td>One image; blit a sub-rectangle with 9-arg <code>drawImage</code></td><td>Many small frames — one request, one decode, cache-friendly</td></tr>
+      </table>
+      <h3>Always preload &amp; decode before playing</h3>
+      <pre class="filename">assets/Loader.js</pre>
+      <pre><code><span class="k">function</span> loadImages(urls) {
+  <span class="k">return</span> Promise.all(urls.map(src =&gt; <span class="k">new</span> Promise((res, rej) =&gt; {
+    <span class="k">const</span> img = <span class="k">new</span> Image();
+    img.onload  = () =&gt; res(img);
+    img.onerror = rej;
+    img.src = src;                 <span class="c">// kicks off async load + decode</span>
+  })));
+}
+
+<span class="k">const</span> frames = <span class="k">await</span> loadImages(frameUrls);   <span class="c">// decoded &amp; ready — no mid-play stalls</span></code></pre>
+      <h3>Advance on a time accumulator, not per frame</h3>
+      <pre><code><span class="k">let</span> frame = 0, acc = 0;
+<span class="k">const</span> fps = 12, step = 1 / fps;
+
+<span class="k">function</span> tick(dt) {
+  acc += dt;
+  <span class="k">while</span> (acc &gt;= step) { acc -= step; frame = (frame + 1) % frames.length; }
+  ctx.clearRect(0, 0, w, h);
+  ctx.drawImage(frames[frame], x, y);   <span class="c">// playback speed fixed at `fps`,</span>
+}                                       <span class="c">// independent of display refresh</span></code></pre>
+      <h3>Sprite-sheet variant — one image, sub-rectangles</h3>
+      <pre><code><span class="k">const</span> COLS = 8, CW = 64, CH = 64;        <span class="c">// cell grid inside one sheet</span>
+<span class="k">const</span> sx = (frame % COLS) * CW;
+<span class="k">const</span> sy = Math.floor(frame / COLS) * CH;
+<span class="c">// 9-arg drawImage: source rect  →  destination rect</span>
+ctx.drawImage(sheet, sx, sy, CW, CH, x, y, CW, CH);</code></pre>
+      <div class="callout warn"><span class="tag">The #1 mistake</span><p>Never set <code>img.src</code> inside the render loop — assigning <code>src</code> triggers an async load and decode, so you'll flash blanks and thrash memory. Load every image <em>once</em> up front; in the loop you only ever <code>drawImage</code> an already-decoded one.</p></div>
+      <div class="callout tip"><span class="tag">Going faster</span><p>For heavy playback use <code>createImageBitmap(blobOrImage)</code> — it returns a pre-decoded, GPU-friendly bitmap that draws faster than an <code>&lt;img&gt;</code> and can be handed to a Web Worker with <code>OffscreenCanvas</code>. Cap how many frames you keep decoded if you have hundreds.</p></div>
+    </section>
+
+    <!-- 12 -->
+    <section id="anim">
+      <span class="sec-num">SECTION 12</span>
+      <h2>Animation without a library</h2>
+      <p>A tween system is ~40 lines. Pick an easing and watch both the curve and the box it drives:</p>
+      <div class="demo" data-demo="tween">
+        <div class="demo-head"><span class="label">tween playground</span></div>
+        <div class="demo-body">
+          <canvas id="tweenCanvas" height="170"></canvas>
+          <div class="controls">
+            <select class="sel" id="tweenEase">
+              <option value="linear">linear</option>
+              <option value="easeOutCubic" selected>easeOutCubic</option>
+              <option value="easeInOutQuad">easeInOutQuad</option>
+              <option value="easeOutBack">easeOutBack</option>
+              <option value="easeOutElastic">easeOutElastic</option>
+            </select>
+            <button class="btn primary" id="tweenPlay">Play ▸</button>
+            <span class="readout">curve drawn left → right</span>
+          </div>
+        </div>
+      </div>
+        <details class="src"><summary>View source &mdash; tween playground</summary><pre><code>safe('tween', function(){
+    var canvas=document.getElementById('tweenCanvas'); if(!canvas) return;
+    var v=makeView(canvas);
+    var easings={
+      linear:function(t){return t;},
+      easeOutCubic:function(t){return 1-Math.pow(1-t,3);},
+      easeInOutQuad:function(t){return t&lt;.5?2*t*t:1-Math.pow(-2*t+2,2)/2;},
+      easeOutBack:function(t){var c1=1.70158,c3=c1+1;return 1+c3*Math.pow(t-1,3)+c1*Math.pow(t-1,2);},
+      easeOutElastic:function(t){var c4=(2*Math.PI)/3;return t===0?0:t===1?1:Math.pow(2,-10*t)*Math.sin((t*10-0.75)*c4)+1;}
+    };
+    var easeName='easeOutCubic', playing=false, tt=0, dur=1.1, raf, last=0, boxSize=26;
+    function drawStatic(p){
+      var ctx=v.ctx, W=v.w, H=v.h, trackY=H-34;
+      var b={x0:40,x1:W-24,y0:30,y1:H-54}, f=easings[easeName];
+      ctx.clearRect(0,0,W,H);
+      ctx.strokeStyle='#E3E1D9'; ctx.lineWidth=1;
+      ctx.beginPath(); ctx.moveTo(b.x0,b.y0); ctx.lineTo(b.x0,b.y1); ctx.lineTo(b.x1,b.y1); ctx.stroke();
+      ctx.strokeStyle='#2B44E0'; ctx.lineWidth=2; ctx.beginPath();
+      for(var i=0;i&lt;=60;i++){ var t=i/60, x=b.x0+(b.x1-b.x0)*t, y=b.y1-(b.y1-b.y0)*f(t); i?ctx.lineTo(x,y):ctx.moveTo(x,y); }
+      ctx.stroke();
+      var mx=b.x0+(b.x1-b.x0)*p, my=b.y1-(b.y1-b.y0)*f(p);
+      ctx.fillStyle='#ff5577'; ctx.beginPath(); ctx.arc(mx,my,4,0,Math.PI*2); ctx.fill();
+      var e=f(p), bx=b.x0+(b.x1-b.x0-boxSize)*e;
+      ctx.fillStyle='#16181D'; ctx.fillRect(bx,trackY,boxSize,boxSize);
+      ctx.strokeStyle='#E3E1D9'; ctx.beginPath(); ctx.moveTo(b.x0,trackY+boxSize+6); ctx.lineTo(b.x1,trackY+boxSize+6); ctx.stroke();
+    }
+    function frame(now){
+      if(!playing) return;
+      var dt=Math.min((now-last)/1000,0.05); last=now;
+      tt=Math.min(tt+dt/dur,1); drawStatic(tt);
+      if(tt&gt;=1){ playing=false; return; } raf=requestAnimationFrame(frame);
+    }
+    var es=document.getElementById('tweenEase'); if(es) es.addEventListener('change',function(){ easeName=this.value; drawStatic(playing?tt:1); });
+    var pl=document.getElementById('tweenPlay'); if(pl) pl.addEventListener('click',function(){ if(reduce){drawStatic(1);return;} tt=0; playing=true; last=performance.now(); raf=requestAnimationFrame(frame); });
+    v.onResize=function(){ drawStatic(playing?tt:1); };
+    whenVisible(canvas, function(){ v.refit(); drawStatic(1); }, function(){ playing=false; cancelAnimationFrame(raf); });
+  });</code></pre></details>
+      <pre><code><span class="k">export const</span> easings = {
+  linear:        t =&gt; t,
+  easeOutCubic:  t =&gt; 1 - Math.pow(1 - t, 3),
+  easeInOutQuad: t =&gt; t &lt; .5 ? 2*t*t : 1 - Math.pow(-2*t + 2, 2)/2,
+};
+
+<span class="k">class</span> Tween {
+  constructor(target, to, { duration = .3, easing = easings.easeOutCubic } = {}) {
+    this.target = target; this.to = to; this.from = {};
+    <span class="k">for</span> (<span class="k">const</span> k <span class="k">in</span> to) this.from[k] = target[k];
+    this.duration = duration; this.easing = easing; this.t = 0;
+  }
+  update(dt) {
+    this.t = Math.min(this.t + dt / this.duration, 1);
+    <span class="k">const</span> e = this.easing(this.t);
+    <span class="k">for</span> (<span class="k">const</span> k <span class="k">in</span> this.to)
+      this.target[k] = this.from[k] + (this.to[k] - this.from[k]) * e;
+    this.done = this.t &gt;= 1;
+  }
+}</code></pre>
+      <p>The whole trick: <em>mutate a shape's properties over time, mark dirty, let the loop draw it.</em> The same loop drives physics — integrate velocity by <code>dt</code> for inertia after a drag.</p>
+    </section>
+
+    <!-- 13 -->
+    <section id="custom">
+      <span class="sec-num">SECTION 13</span>
+      <h2>Customization options</h2>
+      <p>Merge user options over defaults — never mutate the user's object.</p>
+      <pre><code><span class="k">const</span> DEFAULTS = {
+  background: '#ffffff',
+  grid: { enabled: <span class="k">false</span>, size: 24, color: '#eee' },
+  theme: 'light',
+  onChange: <span class="k">null</span>,
+};
+<span class="k">function</span> mergeOptions(d, u) {
+  <span class="k">return</span> { ...d, ...u, grid: { ...d.grid, ...(u.grid || {}) } };
+}</code></pre>
+      <ol>
+        <li><strong>Sensible defaults.</strong> Zero config should already do something useful.</li>
+        <li><strong>Theme with tokens, not hardcoded colors.</strong> Pass <code>{ surface, accent, gridLine }</code> and reference tokens in shapes.</li>
+        <li><strong>Extension points over option bloat.</strong> Let users register custom shape types and tools (the registry/plugin patterns from <a class="xref" href="#patterns">§02</a>).</li>
+        <li><strong>Callbacks <em>and</em> events.</strong> Offer <code>onChange</code> and an emitter.</li>
+        <li><strong>Pluggable rendering.</strong> Allow a per-shape <code>draw</code> override.</li>
+      </ol>
+      <h3>A tool system for editing modes</h3>
+      <p>For an interactive board, model each mode — select, pen, rectangle, pan — as a <em>tool</em>: an object with pointer handlers. The board just routes input to whichever tool is active, so adding a behavior never touches the core.</p>
+      <pre><code><span class="k">const</span> tools = {
+  select: { down(p){ board.pick(p); }, move(p){ board.dragSelection(p); }, up(){} },
+  pen:    { down(p){ board.begin(p); }, move(p){ board.extend(p); }, up(){ board.commit(); } },
+};
+<span class="k">let</span> active = tools.pen;
+board.on('pointerdown', (e) =&gt; active.down(e));   <span class="c">// route to the active tool</span>
+board.setTool = (name) =&gt; { active = tools[name]; };</code></pre>
+    </section>
+
+    <!-- 14 -->
+    <section id="api">
+      <span class="sec-num">SECTION 14</span>
+      <h2>Designing the public API</h2>
+      <p>The public API <em>is</em> the product — it's the only part most users ever see. The console below is a real (tiny) board instance: each button calls a genuine method, every method emits an event into the log, and "Export JSON" serializes the live scene. Drive it:</p>
+      <div class="demo" data-demo="api">
+        <div class="demo-head"><span class="label">live api console</span></div>
+        <div class="demo-body">
+          <div class="api-wrap">
+            <div>
+              <canvas id="apiCanvas" height="240"></canvas>
+              <div class="controls">
+                <button class="btn primary" id="apiRect">add rect</button>
+                <button class="btn primary" id="apiCircle">add circle</button>
+                <button class="btn" id="apiAnimate">animate</button>
+                <button class="btn" id="apiUndo">undo</button>
+                <button class="btn" id="apiClear">clear</button>
+                <button class="btn" id="apiExport">export JSON</button>
+              </div>
+            </div>
+            <div>
+              <div class="log" id="apiLog" aria-live="polite"></div>
+            </div>
+          </div>
+          <pre class="json-out" id="apiJson"></pre>
+        </div>
+      </div>
+        <details class="src"><summary>View source &mdash; API console</summary><pre><code>safe('api', function(){
+    var canvas=document.getElementById('apiCanvas'); if(!canvas) return;
+    var v=makeView(canvas);
+    var logEl=document.getElementById('apiLog'), jsonEl=document.getElementById('apiJson');
+    var shapes=[], past=[], tweens=[], dirty=true, raf, last=0, running=false, uid=0;
+    var colors=['#2B44E0','#ff5577','#37b88f','#E8820C','#7b5cff'];
+    function stamp(){ return new Date().toLocaleTimeString([], {hour12:false}); }
+    function log(name, detail){
+      if(!logEl) return;
+      var row=document.createElement('div'); row.className='ev';
+      row.innerHTML='&lt;span class="ts"&gt;'+stamp()+'&lt;/span&gt; &lt;span class="nm"&gt;'+name+'&lt;/span&gt; '+(detail||'');
+      logEl.appendChild(row); logEl.scrollTop=logEl.scrollHeight;
+      while(logEl.children.length&gt;40) logEl.removeChild(logEl.firstChild);
+    }
+    function emit(name, detail){ log(name, detail); }
+    function doCmd(cmd){ cmd.apply(); past.push(cmd); dirty=true; }
+    function rnd(min,max){ return min+Math.random()*(max-min); }
+    function addShape(kind){
+      var s={ id:++uid, kind:kind, x:rnd(20,Math.max(40,v.w-90)), y:rnd(20,Math.max(40,v.h-90)), w:rnd(46,80), r:rnd(20,34), c:colors[uid%colors.length] };
+      doCmd({ apply:function(){ shapes.push(s); }, revert:function(){ var i=shapes.indexOf(s); if(i&gt;=0)shapes.splice(i,1); } });
+      emit('add', '{ id:'+s.id+', type:"'+kind+'" }'); emit('change', '{ count:'+shapes.length+' }');
+    }
+    function bind(id, fn){ var el=document.getElementById(id); if(el) el.addEventListener('click', fn); }
+    bind('apiRect', function(){ addShape('rect'); });
+    bind('apiCircle', function(){ addShape('circle'); });
+    bind('apiAnimate', function(){
+      if(!shapes.length){ emit('noop', 'nothing to animate'); return; }
+      var s=shapes[shapes.length-1];
+      tweens.push({ s:s, fromX:s.x, toX:rnd(20,Math.max(40,v.w-90)), fromY:s.y, toY:rnd(20,Math.max(40,v.h-90)), t:0, dur:0.7 });
+      emit('tween', '{ id:'+s.id+', duration:0.7 }');
+    });
+    bind('apiUndo', function(){
+      var c=past.pop(); if(c){ c.revert(); dirty=true; emit('undo', '{ remaining:'+past.length+' }'); emit('change', '{ count:'+shapes.length+' }'); }
+      else emit('noop', 'history empty');
+    });
+    bind('apiClear', function(){
+      var old=shapes.slice();
+      doCmd({ apply:function(){ shapes.length=0; }, revert:function(){ Array.prototype.push.apply(shapes, old); } });
+      emit('clear', '{ removed:'+old.length+' }'); emit('change', '{ count:0 }');
+    });
+    bind('apiExport', function(){
+      var json=JSON.stringify({ version:1, shapes:shapes.map(function(s){
+        return s.kind==='rect' ? {type:'rect',id:s.id,x:Math.round(s.x),y:Math.round(s.y),w:Math.round(s.w),h:Math.round(s.w)}
+                               : {type:'circle',id:s.id,x:Math.round(s.x),y:Math.round(s.y),r:Math.round(s.r)};
+      })}, null, 2);
+      if(jsonEl){ jsonEl.style.display='block'; jsonEl.textContent='board.toJSON()  -&gt;\n'+json; }
+      emit('export', '{ bytes:'+json.length+' }');
+    });
+    v.onResize=function(){ dirty=true; };
+    function frame(now){
+      if(!running) return;
+      var dt=Math.min((now-last)/1000,0.05); last=now;
+      var ctx=v.ctx, W=v.w, H=v.h;
+      if(tweens.length){
+        for(var i=tweens.length-1;i&gt;=0;i--){
+          var tw=tweens[i]; tw.t=Math.min(tw.t+dt/tw.dur,1); var e=1-Math.pow(1-tw.t,3);
+          tw.s.x=tw.fromX+(tw.toX-tw.fromX)*e; tw.s.y=tw.fromY+(tw.toY-tw.fromY)*e;
+          dirty=true; if(tw.t&gt;=1) tweens.splice(i,1);
+        }
+      }
+      if(dirty){
+        ctx.clearRect(0,0,W,H);
+        ctx.strokeStyle='rgba(22,24,29,0.05)'; ctx.lineWidth=1;
+        for(var gx=0;gx&lt;W;gx+=22){ ctx.beginPath();ctx.moveTo(gx,0);ctx.lineTo(gx,H);ctx.stroke(); }
+        for(var gy=0;gy&lt;H;gy+=22){ ctx.beginPath();ctx.moveTo(0,gy);ctx.lineTo(W,gy);ctx.stroke(); }
+        shapes.forEach(function(s){
+          ctx.save(); ctx.fillStyle=s.c; ctx.globalAlpha=0.92;
+          if(s.kind==='rect'){ ctx.fillRect(s.x,s.y,s.w,s.w); }
+          else { ctx.beginPath(); ctx.arc(s.x+s.r,s.y+s.r,s.r,0,Math.PI*2); ctx.fill(); }
+          ctx.restore();
+        });
+        if(!shapes.length){ ctx.fillStyle='#5C616B'; ctx.font='13px ui-monospace,monospace'; ctx.fillText('press a button to call the API -&gt;', 14, H/2); }
+        dirty=false;
+      }
+      raf=requestAnimationFrame(frame);
+    }
+    emit('ready', 'new DrawBoard("#stage")');
+    whenVisible(canvas,
+      function(){ if(running)return; v.refit(); dirty=true; running=true; last=performance.now(); raf=requestAnimationFrame(frame); },
+      function(){ running=false; cancelAnimationFrame(raf); });
+  });</code></pre></details>
+      <h3>Principles</h3>
+      <ul>
+        <li><strong>Verb methods, noun getters.</strong> <code>add()</code>, <code>remove()</code>, <code>select()</code>, <code>clear()</code>; <code>getShapes()</code>, <code>toJSON()</code>.</li>
+        <li><strong>Return <code>this</code> for fluent setup</strong> where chaining reads naturally.</li>
+        <li><strong>Events for "something happened", options for config.</strong> Mirror the DOM: <code>on</code> / <code>off</code> / <code>emit</code>.</li>
+        <li><strong>Promises for anything that waits or can fail</strong> — loading assets, exporting an image.</li>
+        <li><strong>Stable IDs</strong> so external code can reference a shape later.</li>
+        <li><strong>Registries, not hardcoding.</strong> <code>registerShape()</code> / <code>registerTool()</code> let users extend without forking.</li>
+      </ul>
+      <pre class="filename">the facade your users touch</pre>
+      <pre><code><span class="k">class</span> DrawBoard <span class="k">extends</span> Emitter {
+  add(shape)              { this.scene.add(shape); this._changed('add', shape); <span class="k">return this</span>; }
+  remove(shape)           { this.scene.remove(shape); this._changed('remove', shape); <span class="k">return this</span>; }
+  select(shape)           { this._sel = shape; this.emit('select', { shape }); <span class="k">return this</span>; }
+  clear()                 { this.scene.clear(); this._changed('clear'); <span class="k">return this</span>; }
+  getShapes()             { <span class="k">return</span> [...this.scene.shapes]; }   <span class="c">// copy, not the live array</span>
+
+  tween(target, to, opts) { <span class="k">return</span> this._tweens.add(<span class="k">new</span> Tween(target, to, opts)); }
+  undo()                  { this.history.undo(); <span class="k">return this</span>; }
+  redo()                  { this.history.redo(); <span class="k">return this</span>; }
+
+  toJSON()                { <span class="k">return</span> this.scene.serialize(); }
+  load(json)              { this.scene.deserialize(json, this.registry); this.requestRender(); <span class="k">return this</span>; }
+  toPNG(type = 'image/png') { <span class="k">return new</span> Promise(r =&gt; this.canvas.toBlob(r, type)); }
+
+  registerShape(name, Ctor) { this.registry[name] = Ctor; <span class="k">return this</span>; }
+  registerTool(name, tool)  { this.tools[name] = tool; <span class="k">return this</span>; }
+
+  destroy()  { <span class="c">/* tear everything down — see Lifecycle */</span> }
+  _changed(type, shape) { this.requestRender(); this.emit('change', { type, shape }); }
+}</code></pre>
+      <pre class="filename">…so consuming it reads like this</pre>
+      <pre><code><span class="k">const</span> board = <span class="k">new</span> DrawBoard('#stage', { theme: 'dark', grid: { enabled: <span class="k">true</span> } });
+
+board
+  .registerShape('star', StarShape)
+  .on('change', ({ type }) =&gt; saveDraft())
+  .on('select', ({ shape }) =&gt; inspector.show(shape));
+
+<span class="k">const</span> box = board.add(<span class="k">new</span> Rect({ x: 40, y: 40, w: 120, h: 80 }));
+board.tween(box, { x: 300 }, { duration: .6, easing: easings.easeOutCubic });
+
+<span class="k">const</span> png = <span class="k">await</span> board.toPNG();      <span class="c">// a Blob, ready to download or upload</span></code></pre>
+      <div class="callout tip"><span class="tag">Design test</span><p>Write the example usage <em>before</em> the implementation. If the call site reads awkwardly on paper, no amount of internal cleverness will save it. The README's first code block is your real spec.</p></div>
+    </section>
+
+    <!-- 15 NEW -->
+    <section id="frameworks">
+      <span class="sec-num">SECTION 15</span>
+      <h2>Using it inside a framework</h2>
+      <p>A well-built vanilla component drops into <em>any</em> framework, because they all hand you a DOM node and a lifecycle. The pattern is identical everywhere: <strong>create on mount, destroy on unmount, sync props through methods.</strong> This is the payoff for the engine/mount split and the <code>destroy()</code> from <a class="xref" href="#life">§21</a>.</p>
+      <pre class="filename">React</pre>
+      <pre><code><span class="k">function</span> Board({ theme }) {
+  <span class="k">const</span> ref = useRef(<span class="k">null</span>);
+  <span class="k">const</span> board = useRef(<span class="k">null</span>);
+
+  useEffect(() =&gt; {
+    board.current = <span class="k">new</span> DrawBoard(ref.current, { theme });
+    <span class="k">return</span> () =&gt; board.current.destroy();        <span class="c">// cleanup on unmount</span>
+  }, []);
+
+  useEffect(() =&gt; { board.current?.set('theme', theme); }, [theme]); <span class="c">// sync a prop</span>
+
+  <span class="k">return</span> &lt;div ref={ref} /&gt;;
+}</code></pre>
+      <pre class="filename">Vue 3 (script setup)</pre>
+      <pre><code><span class="k">const</span> el = ref(<span class="k">null</span>);
+<span class="k">let</span> board;
+onMounted(() =&gt; { board = <span class="k">new</span> DrawBoard(el.value, props); });
+onBeforeUnmount(() =&gt; board.destroy());
+watch(() =&gt; props.theme, (t) =&gt; board.set('theme', t));</code></pre>
+      <pre class="filename">Svelte</pre>
+      <pre><code><span class="k">let</span> el, board;
+onMount(() =&gt; {
+  board = <span class="k">new</span> DrawBoard(el, { theme });
+  <span class="k">return</span> () =&gt; board.destroy();
+});
+$: board?.set('theme', theme);   <span class="c">// reactive prop sync</span></code></pre>
+      <div class="callout tip"><span class="tag">Ship the element, write less glue</span><p>If you publish the <strong>Custom Element</strong> wrapper from <a class="xref" href="#patterns">§02</a>, frameworks can often use <code>&lt;draw-board theme="dark"&gt;&lt;/draw-board&gt;</code> directly — React 19+, Vue and Svelte all handle custom elements natively, including attributes and events. Write once, consume everywhere: the single best argument for the element wrapper.</p></div>
+    </section>
+
+    <!-- 16 -->
+    <section id="state">
+      <span class="sec-num">SECTION 16</span>
+      <h2>Save, load &amp; export</h2>
+      <p>Because your scene is plain data, serialization is nearly free — give each shape a <code>type</code> and a <code>toJSON</code>, and keep a registry to rebuild them.</p>
+      <pre><code>save() {
+  <span class="k">return</span> JSON.stringify({
+    version: 1,
+    shapes: this.scene.shapes.map(s =&gt; ({ type: s.type, ...s.toJSON() })),
+  });
+}
+load(json) {
+  <span class="k">const</span> data = JSON.parse(json);
+  this.scene.shapes = data.shapes.map(s =&gt; <span class="k">new</span> this.registry[s.type](s));
+  this.requestRender();
+}</code></pre>
+      <p>Export the picture as an image — prefer <code>toBlob</code> (async, memory-friendly) over <code>toDataURL</code>:</p>
+      <pre><code>canvas.toBlob((blob) =&gt; {
+  <span class="k">const</span> url = URL.createObjectURL(blob);
+  <span class="k">const</span> a = Object.assign(document.createElement('a'),
+    { href: url, download: 'board.png' });
+  a.click();
+  URL.revokeObjectURL(url);
+}, 'image/png');</code></pre>
+      <div class="callout warn"><span class="tag">Gotcha</span><p>Draw a cross-origin image onto the canvas and <code>toBlob</code> throws — the canvas is "tainted." Serve assets same-origin or with CORS headers and set <code>img.crossOrigin = 'anonymous'</code>.</p></div>
+    </section>
+
+    <!-- 17 -->
+    <section id="undo">
+      <span class="sec-num">SECTION 17</span>
+      <h2>Undo &amp; redo (command pattern)</h2>
+      <p>Don't snapshot the whole scene per change — model each edit as a command that applies and reverses itself.</p>
+      <pre><code><span class="k">class</span> History {
+  #past = []; #future = [];
+  do(cmd) { cmd.apply(); this.#past.push(cmd); this.#future.length = 0; }
+  undo()  { <span class="k">const</span> c = this.#past.pop();   <span class="k">if</span> (c) { c.revert(); this.#future.push(c); } }
+  redo()  { <span class="k">const</span> c = this.#future.pop(); <span class="k">if</span> (c) { c.apply();  this.#past.push(c); } }
+}
+
+<span class="k">const</span> addShape = (scene, shape) =&gt; ({
+  apply()  { scene.add(shape); },
+  revert() { scene.remove(shape); },
+});</code></pre>
+      <p>Tiny memory footprint, and complex edits compose — a "move" stores old and new positions; a multi-select drag is one command wrapping many. The console in <a class="xref" href="#api">§14</a> uses exactly this.</p>
+    </section>
+
+    <!-- 18 -->
+    <section id="perf">
+      <span class="sec-num">SECTION 18</span>
+      <h2>Performance toolkit</h2>
+      <p>Reach for these roughly in order. Measure with <code>performance.now()</code> before adding complexity.</p>
+      <table>
+        <tr><th>Technique</th><th>What it does</th><th>Reach for it when</th></tr>
+        <tr><td><strong>Render on demand</strong></td><td>Only paint on change/animation</td><td>Always — biggest easy win</td></tr>
+        <tr><td><strong>Layered canvases</strong></td><td>Static layer + dynamic layer</td><td>Constant redraws of mostly-static content</td></tr>
+        <tr><td><strong>Off-screen prerender</strong></td><td>Draw costly static art once, <code>drawImage</code> it</td><td>Expensive paths redrawn unchanged</td></tr>
+        <tr><td><strong>Dirty rectangles</strong></td><td><code>clearRect</code> + <code>clip</code> only the changed region</td><td>Layering isn't enough</td></tr>
+        <tr><td><strong>Worker + OffscreenCanvas</strong></td><td>Render off the main thread</td><td>Truly heavy scenes that jank the UI</td></tr>
+      </table>
+      <div class="callout warn"><span class="tag">Avoid GC churn</span><p>Don't allocate objects or arrays inside <code>tick()</code>. No <code>.map</code>/<code>.filter</code> per frame, no fresh vectors — reuse them. Per-frame garbage is what the collector sweeps, and that's the visible stutter.</p></div>
+    </section>
+
+    <!-- 19 -->
+    <section id="a11y">
+      <span class="sec-num">SECTION 19</span>
+      <h2>Accessibility</h2>
+      <p>A canvas is an opaque box to assistive tech. A responsible component compensates:</p>
+      <ul>
+        <li><strong>Fallback content</strong> between the canvas tags, or a parallel off-screen DOM description with <code>aria-live</code> for changes.</li>
+        <li><strong>Keyboard-operable.</strong> Anything selectable/movable by mouse should be reachable by Tab and arrow keys (see <a class="xref" href="#keys">§10</a>).</li>
+        <li><strong>Label the element</strong> with <code>role</code> and <code>aria-label</code>; announce meaningful changes.</li>
+        <li><strong>Respect <code>prefers-reduced-motion</code></strong> — pause ambient animation, as every demo here does.</li>
+        <li><strong>Don't rely on color alone</strong> for selection; add an outline or handle.</li>
+      </ul>
+    </section>
+
+    <!-- 20 NEW -->
+    <section id="testing">
+      <span class="sec-num">SECTION 20</span>
+      <h2>Testing the component</h2>
+      <p>Because the engine is split from the DOM (the whole point of <a class="xref" href="#reusable">§01</a>), most of it tests headlessly — no browser, fast and deterministic.</p>
+      <ul>
+        <li><strong>Unit-test pure logic</strong> — scene management, hit-testing, tweens, serialization — in Node against a stub context.</li>
+        <li><strong>Snapshot the draw calls.</strong> Record the sequence of context calls a render produces and assert on it: a "visual" test with no pixels.</li>
+        <li><strong>Inject a fake clock</strong> (the <code>now</code> option from <a class="xref" href="#reusable">§01</a>) so tweens advance to an exact value on demand.</li>
+        <li><strong>Pixel/visual regression</strong> — render in a headless browser (Playwright) and diff PNGs — only for the few things that truly need pixels.</li>
+      </ul>
+      <pre class="filename">draw-call snapshot with a Proxy stub — no canvas needed</pre>
+      <pre><code><span class="k">const</span> calls = [];
+<span class="k">const</span> fakeCtx = <span class="k">new</span> Proxy({}, {
+  get: (_t, prop) =&gt; (...args) =&gt; calls.push([prop, ...args]),
+});
+
+<span class="k">const</span> scene = <span class="k">new</span> Scene();
+scene.add(<span class="k">new</span> Rect({ x: 10, y: 10, w: 50, h: 50 }));
+scene.render(fakeCtx);
+
+expect(calls).toContainEqual(['fillRect', 10, 10, 50, 50]);</code></pre>
+      <div class="callout tip"><span class="tag">Testability is a design signal</span><p>If a feature is hard to test, it usually has a hidden dependency — a global, a real timer, direct DOM access. Make it injectable and the test gets easy <em>and</em> the component gets more reusable. The two goals point the same way.</p></div>
+    </section>
+
+    <!-- 21 -->
+    <section id="life">
+      <span class="sec-num">SECTION 21</span>
+      <h2>Lifecycle &amp; cleanup</h2>
+      <p>A reusable component <em>must</em> clean up, or it leaks listeners and rAF loops every time it's removed.</p>
+      <pre><code>destroy() {
+  this.ticker.stop();
+  this.input.destroy();          <span class="c">// removes pointer + key listeners</span>
+  this.resizeObserver.disconnect();
+  this.emitter.clear?.();
+  this.canvas.remove();
+  this._destroyed = <span class="k">true</span>;
+}</code></pre>
+      <p>Go the Custom Element route and <code>disconnectedCallback()</code> calls this automatically when the element leaves the DOM. This is exactly what makes the framework wrappers in <a class="xref" href="#frameworks">§15</a> leak-free.</p>
+    </section>
+
+    <!-- 22 -->
+    <section id="ship">
+      <span class="sec-num">SECTION 22</span>
+      <h2>Shipping it as a library</h2>
+      <ul>
+        <li><strong>Ship ESM</strong> with a clean <code>"exports"</code> map and <code>"sideEffects": false</code> for tree-shaking (see <a class="xref" href="#modules">§03</a>).</li>
+        <li><strong>One entry point.</strong> Export <code>DrawBoard</code>, base <code>Shape</code>, built-in shapes and <code>easings</code>; keep helpers unexported.</li>
+        <li><strong>No global state.</strong> Two boards on one page must never interfere.</li>
+        <li><strong>Zero dependencies</strong> — a headline feature.</li>
+        <li><strong>Document the extension points</strong>, not just the methods.</li>
+        <li><strong>Ship a hand-written <code>index.d.ts</code></strong> for autocomplete even without TypeScript.</li>
+        <li><strong>Semver the public API.</strong> The methods/events/options in <a class="xref" href="#api">§14</a> are your contract; breaking them is a major bump.</li>
+      </ul>
+    </section>
+
+    <!-- 23 -->
+    <section id="gotchas">
+      <span class="sec-num">SECTION 23</span>
+      <h2>Gotchas &amp; pro tips</h2>
+      <ul>
+        <li><strong>Never set <code>img.src</code> in the loop</strong> — preload, then only <code>drawImage</code> (see <a class="xref" href="#sprites">§11</a>).</li>
+        <li><strong>Canvas text is expensive and unselectable.</strong> Cache <code>measureText</code> results; overlay real DOM for editable text.</li>
+        <li><strong>Sub-pixel lines blur.</strong> A 1px stroke at integer x sits between pixels — offset by <code>0.5</code>.</li>
+        <li><strong><code>imageSmoothingEnabled = false</code></strong> for crisp pixel-art upscaling.</li>
+        <li><strong>Throttle <code>pointermove</code>.</strong> Collect points, process once per tick.</li>
+        <li><strong>Clear in the right space.</strong> <code>clearRect</code> respects the current transform — reset it or clear in world coords if a camera is applied.</li>
+        <li><strong>Cap the pixel ratio</strong> (<code>min(dpr, 2)</code>) on big canvases to avoid huge backing stores on 3× phones.</li>
+        <li><strong>Clear the held-key Set on blur</strong> so keys don't stick after alt-tab.</li>
+        <li><strong>Don't mutate the options object</strong> the caller passed in — clone it (see <a class="xref" href="#custom">§13</a>).</li>
+      </ul>
+    </section>
+
+    <!-- 24 -->
+    <section id="checklist">
+      <span class="sec-num">SECTION 24</span>
+      <h2>The build checklist</h2>
+      <ul class="checklist">
+        <li>Per-instance state — no module-level mutables</li>
+        <li>Dependencies injected (canvas, options, clock); no global lookups</li>
+        <li>One authoring pattern chosen deliberately (class / factory / element)</li>
+        <li>Engine separated from DOM mount (testable core)</li>
+        <li>DPR handled, capped, and ResizeObserver wired</li>
+        <li>Single rAF loop with delta time; renders on demand</li>
+        <li>Camera transform with an inverse for input</li>
+        <li>Shapes expose <code>draw()</code> + <code>hitTest()</code>; scene sorted by z</li>
+        <li>Pointer Events with capture + <code>touch-action:none</code></li>
+        <li>Keyboard via a held-key Set applied with <code>dt</code>; focusable canvas</li>
+        <li>Images preloaded &amp; decoded; frames advanced on a time accumulator</li>
+        <li>Tween system driven by the loop</li>
+        <li>Options merged over defaults; theming via tokens</li>
+        <li>Fluent, event-emitting public API with stable IDs &amp; registries</li>
+        <li>Framework wrappers create on mount, destroy on unmount</li>
+        <li>Serialize / load to JSON; export to PNG via <code>toBlob</code></li>
+        <li>Undo/redo via the command pattern</li>
+        <li>Headless tests on the pure core; injectable clock</li>
+        <li>Keyboard operable, labelled, reduced-motion respected</li>
+        <li><code>destroy()</code> removes every listener, observer and the loop</li>
+        <li>ESM + CJS/UMD outputs, single entry point, no globals, no dependencies</li>
+      </ul>
+      <div class="callout tip"><span class="tag">If you build one thing first</span><p>Wire up per-instance state, the engine/mount split, the delta-time render loop, and a single <code>Shape</code> with <code>draw</code> + <code>hitTest</code>. Everything else in this course hangs off those.</p></div>
+    </section>
+
+    <footer>
+      Crash course · vanilla JS + HTML Canvas · 9 live demos · 25 sections · fully self-contained — zero external requests, works offline, same spirit as the library you're about to build.
+    </footer>
+  </main>
+
+  <aside class="rightrail" aria-hidden="true"></aside>
+</div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+  var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var DPR = Math.min(window.devicePixelRatio || 1, 2);
+  var views = [];   // every makeView() registers here so one resize handler can refit all
+
+  function onReady(fn){
+    function go(){ requestAnimationFrame(function(){ requestAnimationFrame(fn); }); }
+    if (document.readyState === 'complete') { go(); }
+    else { window.addEventListener('load', go, { once:true }); }
+  }
+
+  // Run a demo in isolation: a failure logs a clear note but never breaks the page or other demos.
+  function safe(name, fn){
+    try { fn(); }
+    catch (e){ if (window.console && console.warn) console.warn('[demo: ' + name + '] ' + (e && e.message ? e.message : e)); }
+  }
+
+  // A self-correcting view over a canvas. NB: no ResizeObserver here on purpose — drawing to a
+  // canvas from inside an RO callback can trigger the "ResizeObserver loop" console error. We
+  // re-fit explicitly: at boot, when a demo scrolls into view, and on a debounced window resize.
+  function makeView(canvas, opts){
+    opts = opts || {};
+    var ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error('2D context unavailable');
+    var v = { ctx: ctx, w: 0, h: 0, onResize: null, refit: refit };
+    function refit(){
+      var rect = canvas.getBoundingClientRect();
+      var cssW = Math.round(rect.width) || canvas.clientWidth
+              || (canvas.parentElement ? canvas.parentElement.clientWidth : 0) || 600;
+      var attrH = parseInt(canvas.getAttribute('height'), 10);
+      var cssH = opts.fixedHeight || attrH || Math.round(rect.height) || 180;
+      if (cssW === v.w && cssH === v.h && canvas.width) return false;
+      canvas.style.height = cssH + 'px';
+      canvas.width  = Math.max(1, Math.round(cssW * DPR));
+      canvas.height = Math.max(1, Math.round(cssH * DPR));
+      ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+      v.w = cssW; v.h = cssH;
+      return true;
+    }
+    refit();
+    views.push(v);
+    return v;
+  }
+
+  function whenVisible(el, start, stop){
+    if (!('IntersectionObserver' in window)){ start(); return; }
+    var io = new IntersectionObserver(function(ents){
+      ents.forEach(function(e){ e.isIntersecting ? start() : stop(); });
+    }, { threshold: 0.01 });
+    io.observe(el);
+  }
+
+  function boot(){
+
+  /* ---------------- HERO ---------------- */
+  safe('hero', function(){
+    var canvas = document.getElementById('heroCanvas'); if(!canvas) return;
+    var v = makeView(canvas);
+    var shapes = [], strokes = [], cur = null, running = false, raf, last = 0;
+    var palette = ['#2B44E0','#ff5577','#37b88f','#E8820C','#7b5cff'];
+    for (var i=0;i<7;i++){
+      shapes.push({ x:Math.random()*v.w, y:Math.random()*v.h, vx:(Math.random()-.5)*40, vy:(Math.random()-.5)*40,
+        r:10+Math.random()*26, c:palette[i%palette.length], a:.14+Math.random()*.12 });
+    }
+    function toLocal(e){ var r=canvas.getBoundingClientRect(); return {x:e.clientX-r.left,y:e.clientY-r.top}; }
+    canvas.addEventListener('pointerdown',function(e){ canvas.setPointerCapture(e.pointerId); cur={c:'#16181D',pts:[toLocal(e)]}; strokes.push(cur); });
+    canvas.addEventListener('pointermove',function(e){ if(cur) cur.pts.push(toLocal(e)); });
+    window.addEventListener('pointerup',function(){ cur=null; });
+    function frame(now){
+      if(!running) return;
+      var dt=Math.min((now-last)/1000,0.05); last=now;
+      var ctx=v.ctx, W=v.w, H=v.h;
+      ctx.clearRect(0,0,W,H);
+      ctx.strokeStyle='rgba(22,24,29,0.04)'; ctx.lineWidth=1;
+      for(var gx=0;gx<W;gx+=22){ ctx.beginPath();ctx.moveTo(gx,0);ctx.lineTo(gx,H);ctx.stroke(); }
+      for(var gy=0;gy<H;gy+=22){ ctx.beginPath();ctx.moveTo(0,gy);ctx.lineTo(W,gy);ctx.stroke(); }
+      shapes.forEach(function(s){
+        if(!reduce){ s.x+=s.vx*dt; s.y+=s.vy*dt;
+          if(s.x<s.r||s.x>W-s.r)s.vx*=-1; if(s.y<s.r||s.y>H-s.r)s.vy*=-1;
+          s.x=Math.max(s.r,Math.min(W-s.r,s.x)); s.y=Math.max(s.r,Math.min(H-s.r,s.y)); }
+        ctx.save(); ctx.globalAlpha=s.a; ctx.fillStyle=s.c; ctx.beginPath(); ctx.arc(s.x,s.y,s.r,0,Math.PI*2); ctx.fill(); ctx.restore();
+      });
+      strokes.forEach(function(st){
+        if(st.pts.length<2) return;
+        ctx.save(); ctx.strokeStyle=st.c; ctx.lineWidth=2.5; ctx.lineJoin='round'; ctx.lineCap='round';
+        ctx.beginPath(); ctx.moveTo(st.pts[0].x,st.pts[0].y);
+        for(var j=1;j<st.pts.length;j++) ctx.lineTo(st.pts[j].x,st.pts[j].y);
+        ctx.stroke(); ctx.restore();
+      });
+      raf=requestAnimationFrame(frame);
+    }
+    v.onResize=function(){ if(!running){ running=true; frame(performance.now()); running=false; } };
+    whenVisible(canvas,
+      function(){ if(running)return; v.refit(); running=true; last=performance.now(); raf=requestAnimationFrame(frame); },
+      function(){ running=false; cancelAnimationFrame(raf); });
+  });
+
+  /* ---------------- DPR ---------------- */
+  safe('dpr', function(){
+    var nv=document.getElementById('dprNaive'), cr=document.getElementById('dprCrisp'); if(!nv||!cr) return;
+    var dval=document.getElementById('dprVal'); if(dval) dval.textContent=(window.devicePixelRatio||1).toFixed(2)+'\u00D7';
+    function widthOf(c){ var r=c.getBoundingClientRect(); return Math.round(r.width)||c.clientWidth||(c.parentElement?c.parentElement.clientWidth:0)||260; }
+    function draw(x,w,h){
+      x.clearRect(0,0,w,h);
+      x.fillStyle='#16181D'; x.font='600 15px system-ui, sans-serif'; x.fillText('Crisp text & lines', 14, 26);
+      x.strokeStyle='#2B44E0'; x.lineWidth=1;
+      for(var i=0;i<6;i++){ x.beginPath(); x.moveTo(14, 42+i*6.5+0.5); x.lineTo(w-14, 42+i*6.5+0.5); x.stroke(); }
+      x.beginPath(); x.arc(w-34, h-32, 20, 0, Math.PI*2); x.fillStyle='#ff5577'; x.fill();
+    }
+    function go(){
+      var h=160;
+      var w1=widthOf(nv); nv.style.height=h+'px'; nv.width=Math.max(1,w1); nv.height=h; draw(nv.getContext('2d'),w1,h);
+      var w2=widthOf(cr); cr.style.height=h+'px'; cr.width=Math.max(1,Math.round(w2*DPR)); cr.height=Math.round(h*DPR);
+      var x=cr.getContext('2d'); x.setTransform(DPR,0,0,DPR,0,0); draw(x,w2,h);
+    }
+    nv.__resize=go;   // picked up by the global resize handler below
+    whenVisible(nv, go, function(){});
+  });
+
+  /* ---------------- Render loop ---------------- */
+  safe('loop', function(){
+    var canvas=document.getElementById('loopCanvas'); if(!canvas) return;
+    var v=makeView(canvas);
+    var ball={x:v.w/2,y:v.h/2,vx:150,vy:110,r:16}, on=true, dirtyOnly=false, dirty=true, raf, last=0, running=false;
+    var fpsEl=document.getElementById('loopFps'), frEl=document.getElementById('loopFrames'), frames=0, acc=0, fc=0;
+    var btn=document.getElementById('loopToggle');
+    if(btn) btn.addEventListener('click',function(){ on=!on; this.textContent=on?'Pause':'Resume'; if(on&&running){last=performance.now();raf=requestAnimationFrame(frame);} });
+    var chk=document.getElementById('loopRender'); if(chk) chk.addEventListener('change',function(){ dirtyOnly=!this.checked; });
+    v.onResize=function(){ dirty=true; };
+    function frame(now){
+      if(!running||!on) return;
+      var dt=Math.min((now-last)/1000,0.05); last=now;
+      var ctx=v.ctx, W=v.w, H=v.h;
+      acc+=dt; fc++; if(acc>=0.5){ if(fpsEl)fpsEl.textContent=Math.round(fc/acc); acc=0; fc=0; }
+      var moved=false;
+      if(!reduce){
+        ball.x+=ball.vx*dt; ball.y+=ball.vy*dt; moved=true;
+        if(ball.x<ball.r||ball.x>W-ball.r){ball.vx*=-1;ball.x=Math.max(ball.r,Math.min(W-ball.r,ball.x));}
+        if(ball.y<ball.r||ball.y>H-ball.r){ball.vy*=-1;ball.y=Math.max(ball.r,Math.min(H-ball.r,ball.y));}
+      }
+      if(moved) dirty=true;
+      if(!dirtyOnly || dirty){
+        ctx.clearRect(0,0,W,H); ctx.fillStyle='rgba(43,68,224,0.08)'; ctx.fillRect(0,0,W,H);
+        ctx.beginPath(); ctx.arc(ball.x,ball.y,ball.r,0,Math.PI*2); ctx.fillStyle='#2B44E0'; ctx.fill();
+        frames++; if(frEl)frEl.textContent=frames; dirty=false;
+      }
+      raf=requestAnimationFrame(frame);
+    }
+    whenVisible(canvas,
+      function(){ if(running)return; v.refit(); running=true; dirty=true; last=performance.now(); if(on)raf=requestAnimationFrame(frame); },
+      function(){ running=false; cancelAnimationFrame(raf); });
+  });
+
+  /* ---------------- Hit test ---------------- */
+  safe('hit', function(){
+    var canvas=document.getElementById('hitCanvas'); if(!canvas) return;
+    var v=makeView(canvas);
+    var sel=document.getElementById('hitSel');
+    var rects=[{id:'A',x:40,y:40,w:130,h:90,c:'#2B44E0'},{id:'B',x:120,y:80,w:130,h:90,c:'#ff5577'},{id:'C',x:200,y:50,w:130,h:90,c:'#37b88f'}], selected=null;
+    function draw(){
+      var ctx=v.ctx; ctx.clearRect(0,0,v.w,v.h);
+      rects.forEach(function(r){
+        ctx.save(); ctx.globalAlpha=0.9; ctx.fillStyle=r.c; ctx.fillRect(r.x,r.y,r.w,r.h);
+        if(selected===r){ ctx.lineWidth=3; ctx.strokeStyle='#16181D'; ctx.strokeRect(r.x-1.5,r.y-1.5,r.w+3,r.h+3); }
+        ctx.fillStyle='#fff'; ctx.font='600 16px system-ui,sans-serif'; ctx.fillText(r.id, r.x+10, r.y+24); ctx.restore();
+      });
+    }
+    canvas.addEventListener('pointerdown',function(e){
+      var b=canvas.getBoundingClientRect(), px=e.clientX-b.left, py=e.clientY-b.top; selected=null;
+      for(var i=rects.length-1;i>=0;i--){ var r=rects[i]; if(px>=r.x&&px<=r.x+r.w&&py>=r.y&&py<=r.y+r.h){ selected=r; break; } }
+      if(sel) sel.textContent=selected?selected.id+' (top of stack)':'none'; draw();
+    });
+    v.onResize=draw;
+    whenVisible(canvas, function(){ v.refit(); draw(); }, function(){});
+  });
+
+  /* ---------------- Freehand ---------------- */
+  safe('draw', function(){
+    var canvas=document.getElementById('drawCanvas'); if(!canvas) return;
+    var v=makeView(canvas);
+    var strokes=[], cur=null, width=4, ptsEl=document.getElementById('drawPts');
+    function redraw(){
+      var ctx=v.ctx; ctx.clearRect(0,0,v.w,v.h); ctx.fillStyle='#fff'; ctx.fillRect(0,0,v.w,v.h);
+      strokes.forEach(function(s){
+        if(s.pts.length<2)return;
+        ctx.save(); ctx.strokeStyle='#16181D'; ctx.lineWidth=s.w; ctx.lineJoin='round'; ctx.lineCap='round';
+        ctx.beginPath(); ctx.moveTo(s.pts[0].x,s.pts[0].y);
+        for(var i=1;i<s.pts.length;i++) ctx.lineTo(s.pts[i].x,s.pts[i].y);
+        ctx.stroke(); ctx.restore();
+      });
+      var n=0; strokes.forEach(function(s){n+=s.pts.length;}); if(ptsEl)ptsEl.textContent=n;
+    }
+    function loc(e){ var b=canvas.getBoundingClientRect(); return {x:e.clientX-b.left,y:e.clientY-b.top}; }
+    canvas.addEventListener('pointerdown',function(e){ canvas.setPointerCapture(e.pointerId); cur={w:width,pts:[loc(e)]}; strokes.push(cur); });
+    canvas.addEventListener('pointermove',function(e){ if(!cur)return; cur.pts.push(loc(e)); redraw(); });
+    window.addEventListener('pointerup',function(){ cur=null; });
+    var rng=document.getElementById('drawWidth'); if(rng) rng.addEventListener('input',function(){ width=+this.value; });
+    var clr=document.getElementById('drawClear'); if(clr) clr.addEventListener('click',function(){ strokes=[]; redraw(); });
+    v.onResize=redraw;
+    whenVisible(canvas, function(){ v.refit(); redraw(); }, function(){});
+  });
+
+  /* ---------------- Mouse + keyboard ---------------- */
+  safe('keys', function(){
+    var canvas=document.getElementById('keysCanvas'); if(!canvas) return;
+    var v=makeView(canvas);
+    var player={x:v.w/2-18,y:v.h/2-18,s:36}, keys={}, dragging=false, dx=0, dy=0, raf, last=0, running=false;
+    var xEl=document.getElementById('keysX'), yEl=document.getElementById('keysY');
+    var caps={}; var nodes=document.querySelectorAll('#keysVis .keycap');
+    for(var i=0;i<nodes.length;i++){ caps[nodes[i].getAttribute('data-k')]=nodes[i]; }
+    function syncCaps(){ for(var k in caps){ if(keys[k]) caps[k].classList.add('on'); else caps[k].classList.remove('on'); } }
+    function has(k){ return !!keys[k]; }
+    canvas.addEventListener('keydown',function(e){
+      var k=e.key.toLowerCase(); keys[k]=true;
+      if(['arrowup','arrowdown','arrowleft','arrowright',' '].indexOf(k)>=0) e.preventDefault();
+      syncCaps();
+    });
+    canvas.addEventListener('keyup',function(e){ keys[e.key.toLowerCase()]=false; syncCaps(); });
+    window.addEventListener('blur',function(){ keys={}; syncCaps(); });
+    function loc(e){ var b=canvas.getBoundingClientRect(); return {x:e.clientX-b.left,y:e.clientY-b.top}; }
+    canvas.addEventListener('pointerdown',function(e){
+      canvas.focus(); var p=loc(e);
+      if(p.x>=player.x&&p.x<=player.x+player.s&&p.y>=player.y&&p.y<=player.y+player.s){ dragging=true; dx=p.x-player.x; dy=p.y-player.y; canvas.setPointerCapture(e.pointerId); }
+    });
+    canvas.addEventListener('pointermove',function(e){ if(!dragging)return; var p=loc(e); player.x=p.x-dx; player.y=p.y-dy; });
+    window.addEventListener('pointerup',function(){ dragging=false; });
+    function frame(now){
+      if(!running) return;
+      var dt=Math.min((now-last)/1000,0.05); last=now;
+      var ctx=v.ctx, W=v.w, H=v.h, speed=has('shift')?460:220;
+      if(!dragging){
+        if(has('w')||has('arrowup'))    player.y-=speed*dt;
+        if(has('s')||has('arrowdown'))  player.y+=speed*dt;
+        if(has('a')||has('arrowleft'))  player.x-=speed*dt;
+        if(has('d')||has('arrowright')) player.x+=speed*dt;
+      }
+      player.x=Math.max(0,Math.min(W-player.s,player.x));
+      player.y=Math.max(0,Math.min(H-player.s,player.y));
+      ctx.clearRect(0,0,W,H);
+      ctx.strokeStyle='rgba(22,24,29,0.05)'; ctx.lineWidth=1;
+      for(var gx=0;gx<W;gx+=22){ ctx.beginPath();ctx.moveTo(gx,0);ctx.lineTo(gx,H);ctx.stroke(); }
+      for(var gy=0;gy<H;gy+=22){ ctx.beginPath();ctx.moveTo(0,gy);ctx.lineTo(W,gy);ctx.stroke(); }
+      var focused=(document.activeElement===canvas);
+      ctx.fillStyle = has('shift') ? '#ff5577' : '#2B44E0';
+      ctx.fillRect(player.x,player.y,player.s,player.s);
+      if(focused){ ctx.strokeStyle='#16181D'; ctx.lineWidth=2; ctx.strokeRect(player.x-3,player.y-3,player.s+6,player.s+6); }
+      ctx.fillStyle='#5C616B'; ctx.font='12px ui-monospace,monospace';
+      ctx.fillText(focused?'focused \u2014 use WASD / arrows / shift':'click to focus, then move', 12, H-12);
+      if(xEl)xEl.textContent=Math.round(player.x); if(yEl)yEl.textContent=Math.round(player.y);
+      raf=requestAnimationFrame(frame);
+    }
+    whenVisible(canvas,
+      function(){ if(running)return; v.refit(); running=true; last=performance.now(); raf=requestAnimationFrame(frame); },
+      function(){ running=false; cancelAnimationFrame(raf); });
+  });
+
+  /* ---------------- PNG flipbook ---------------- */
+  safe('sprite', function(){
+    var canvas=document.getElementById('spriteCanvas'); if(!canvas) return;
+    var v=makeView(canvas);
+    var N=24, frames=[], ready=false, made=0, idx=0, acc=0, fps=12, playing=true, raf, last=0, running=false;
+    var fEl=document.getElementById('spriteFrame'), fpsValEl=document.getElementById('spriteFpsVal');
+    (function generate(){
+      var SIZE=120;
+      for(var i=0;i<N;i++){
+        (function(i){
+          var off=document.createElement('canvas'); off.width=SIZE; off.height=SIZE;
+          var c=off.getContext('2d'); var t=i/N, ang=t*Math.PI*2;
+          c.clearRect(0,0,SIZE,SIZE); c.translate(SIZE/2,SIZE/2);
+          var dots=10;
+          for(var d=0;d<dots;d++){
+            var a=ang + d/dots*Math.PI*2, rad=34+8*Math.sin(ang*2 + d);
+            var x=Math.cos(a)*rad, y=Math.sin(a)*rad, hue=Math.round((d/dots*360 + i*15)%360);
+            c.beginPath(); c.fillStyle='hsl('+hue+',70%,55%)'; c.arc(x,y,6+3*Math.cos(ang+d),0,Math.PI*2); c.fill();
+          }
+          c.beginPath(); c.fillStyle='#16181D'; c.arc(0,0,9+5*Math.abs(Math.sin(ang)),0,Math.PI*2); c.fill();
+          var img=new Image();
+          img.onload=function(){ made++; if(made===N) ready=true; };
+          try { img.src=off.toDataURL('image/png'); } catch(err){ ready=true; }
+          frames[i]=img;
+        })(i);
+      }
+    })();
+    var pb=document.getElementById('spritePlay'); if(pb) pb.addEventListener('click',function(){ playing=!playing; this.textContent=playing?'Pause':'Play \u25B8'; });
+    var fr=document.getElementById('spriteFps'); if(fr) fr.addEventListener('input',function(){ fps=+this.value; if(fpsValEl)fpsValEl.textContent=fps; });
+    function frame(now){
+      if(!running) return;
+      var dt=Math.min((now-last)/1000,0.05); last=now;
+      var ctx=v.ctx, W=v.w, H=v.h;
+      if(ready){
+        if(playing && !reduce){ acc+=dt; var step=1/fps; while(acc>=step){ acc-=step; idx=(idx+1)%N; } }
+        ctx.clearRect(0,0,W,H);
+        var img=frames[idx];
+        if(img && img.width){ var size=Math.min(W,H)-20; ctx.drawImage(img,(W-size)/2,(H-size)/2,size,size); }
+        if(fEl)fEl.textContent=idx;
+      } else {
+        ctx.clearRect(0,0,W,H); ctx.fillStyle='#5C616B'; ctx.font='13px ui-monospace,monospace'; ctx.fillText('encoding 24 PNG frames\u2026', 14, H/2);
+      }
+      raf=requestAnimationFrame(frame);
+    }
+    whenVisible(canvas,
+      function(){ if(running)return; v.refit(); running=true; last=performance.now(); raf=requestAnimationFrame(frame); },
+      function(){ running=false; cancelAnimationFrame(raf); });
+  });
+
+  /* ---------------- Tween ---------------- */
+  safe('tween', function(){
+    var canvas=document.getElementById('tweenCanvas'); if(!canvas) return;
+    var v=makeView(canvas);
+    var easings={
+      linear:function(t){return t;},
+      easeOutCubic:function(t){return 1-Math.pow(1-t,3);},
+      easeInOutQuad:function(t){return t<.5?2*t*t:1-Math.pow(-2*t+2,2)/2;},
+      easeOutBack:function(t){var c1=1.70158,c3=c1+1;return 1+c3*Math.pow(t-1,3)+c1*Math.pow(t-1,2);},
+      easeOutElastic:function(t){var c4=(2*Math.PI)/3;return t===0?0:t===1?1:Math.pow(2,-10*t)*Math.sin((t*10-0.75)*c4)+1;}
+    };
+    var easeName='easeOutCubic', playing=false, tt=0, dur=1.1, raf, last=0, boxSize=26;
+    function drawStatic(p){
+      var ctx=v.ctx, W=v.w, H=v.h, trackY=H-34;
+      var b={x0:40,x1:W-24,y0:30,y1:H-54}, f=easings[easeName];
+      ctx.clearRect(0,0,W,H);
+      ctx.strokeStyle='#E3E1D9'; ctx.lineWidth=1;
+      ctx.beginPath(); ctx.moveTo(b.x0,b.y0); ctx.lineTo(b.x0,b.y1); ctx.lineTo(b.x1,b.y1); ctx.stroke();
+      ctx.strokeStyle='#2B44E0'; ctx.lineWidth=2; ctx.beginPath();
+      for(var i=0;i<=60;i++){ var t=i/60, x=b.x0+(b.x1-b.x0)*t, y=b.y1-(b.y1-b.y0)*f(t); i?ctx.lineTo(x,y):ctx.moveTo(x,y); }
+      ctx.stroke();
+      var mx=b.x0+(b.x1-b.x0)*p, my=b.y1-(b.y1-b.y0)*f(p);
+      ctx.fillStyle='#ff5577'; ctx.beginPath(); ctx.arc(mx,my,4,0,Math.PI*2); ctx.fill();
+      var e=f(p), bx=b.x0+(b.x1-b.x0-boxSize)*e;
+      ctx.fillStyle='#16181D'; ctx.fillRect(bx,trackY,boxSize,boxSize);
+      ctx.strokeStyle='#E3E1D9'; ctx.beginPath(); ctx.moveTo(b.x0,trackY+boxSize+6); ctx.lineTo(b.x1,trackY+boxSize+6); ctx.stroke();
+    }
+    function frame(now){
+      if(!playing) return;
+      var dt=Math.min((now-last)/1000,0.05); last=now;
+      tt=Math.min(tt+dt/dur,1); drawStatic(tt);
+      if(tt>=1){ playing=false; return; } raf=requestAnimationFrame(frame);
+    }
+    var es=document.getElementById('tweenEase'); if(es) es.addEventListener('change',function(){ easeName=this.value; drawStatic(playing?tt:1); });
+    var pl=document.getElementById('tweenPlay'); if(pl) pl.addEventListener('click',function(){ if(reduce){drawStatic(1);return;} tt=0; playing=true; last=performance.now(); raf=requestAnimationFrame(frame); });
+    v.onResize=function(){ drawStatic(playing?tt:1); };
+    whenVisible(canvas, function(){ v.refit(); drawStatic(1); }, function(){ playing=false; cancelAnimationFrame(raf); });
+  });
+
+  /* ---------------- API console ---------------- */
+  safe('api', function(){
+    var canvas=document.getElementById('apiCanvas'); if(!canvas) return;
+    var v=makeView(canvas);
+    var logEl=document.getElementById('apiLog'), jsonEl=document.getElementById('apiJson');
+    var shapes=[], past=[], tweens=[], dirty=true, raf, last=0, running=false, uid=0;
+    var colors=['#2B44E0','#ff5577','#37b88f','#E8820C','#7b5cff'];
+    function stamp(){ return new Date().toLocaleTimeString([], {hour12:false}); }
+    function log(name, detail){
+      if(!logEl) return;
+      var row=document.createElement('div'); row.className='ev';
+      row.innerHTML='<span class="ts">'+stamp()+'</span> <span class="nm">'+name+'</span> '+(detail||'');
+      logEl.appendChild(row); logEl.scrollTop=logEl.scrollHeight;
+      while(logEl.children.length>40) logEl.removeChild(logEl.firstChild);
+    }
+    function emit(name, detail){ log(name, detail); }
+    function doCmd(cmd){ cmd.apply(); past.push(cmd); dirty=true; }
+    function rnd(min,max){ return min+Math.random()*(max-min); }
+    function addShape(kind){
+      var s={ id:++uid, kind:kind, x:rnd(20,Math.max(40,v.w-90)), y:rnd(20,Math.max(40,v.h-90)), w:rnd(46,80), r:rnd(20,34), c:colors[uid%colors.length] };
+      doCmd({ apply:function(){ shapes.push(s); }, revert:function(){ var i=shapes.indexOf(s); if(i>=0)shapes.splice(i,1); } });
+      emit('add', '{ id:'+s.id+', type:"'+kind+'" }'); emit('change', '{ count:'+shapes.length+' }');
+    }
+    function bind(id, fn){ var el=document.getElementById(id); if(el) el.addEventListener('click', fn); }
+    bind('apiRect', function(){ addShape('rect'); });
+    bind('apiCircle', function(){ addShape('circle'); });
+    bind('apiAnimate', function(){
+      if(!shapes.length){ emit('noop', 'nothing to animate'); return; }
+      var s=shapes[shapes.length-1];
+      tweens.push({ s:s, fromX:s.x, toX:rnd(20,Math.max(40,v.w-90)), fromY:s.y, toY:rnd(20,Math.max(40,v.h-90)), t:0, dur:0.7 });
+      emit('tween', '{ id:'+s.id+', duration:0.7 }');
+    });
+    bind('apiUndo', function(){
+      var c=past.pop(); if(c){ c.revert(); dirty=true; emit('undo', '{ remaining:'+past.length+' }'); emit('change', '{ count:'+shapes.length+' }'); }
+      else emit('noop', 'history empty');
+    });
+    bind('apiClear', function(){
+      var old=shapes.slice();
+      doCmd({ apply:function(){ shapes.length=0; }, revert:function(){ Array.prototype.push.apply(shapes, old); } });
+      emit('clear', '{ removed:'+old.length+' }'); emit('change', '{ count:0 }');
+    });
+    bind('apiExport', function(){
+      var json=JSON.stringify({ version:1, shapes:shapes.map(function(s){
+        return s.kind==='rect' ? {type:'rect',id:s.id,x:Math.round(s.x),y:Math.round(s.y),w:Math.round(s.w),h:Math.round(s.w)}
+                               : {type:'circle',id:s.id,x:Math.round(s.x),y:Math.round(s.y),r:Math.round(s.r)};
+      })}, null, 2);
+      if(jsonEl){ jsonEl.style.display='block'; jsonEl.textContent='board.toJSON()  ->\n'+json; }
+      emit('export', '{ bytes:'+json.length+' }');
+    });
+    v.onResize=function(){ dirty=true; };
+    function frame(now){
+      if(!running) return;
+      var dt=Math.min((now-last)/1000,0.05); last=now;
+      var ctx=v.ctx, W=v.w, H=v.h;
+      if(tweens.length){
+        for(var i=tweens.length-1;i>=0;i--){
+          var tw=tweens[i]; tw.t=Math.min(tw.t+dt/tw.dur,1); var e=1-Math.pow(1-tw.t,3);
+          tw.s.x=tw.fromX+(tw.toX-tw.fromX)*e; tw.s.y=tw.fromY+(tw.toY-tw.fromY)*e;
+          dirty=true; if(tw.t>=1) tweens.splice(i,1);
+        }
+      }
+      if(dirty){
+        ctx.clearRect(0,0,W,H);
+        ctx.strokeStyle='rgba(22,24,29,0.05)'; ctx.lineWidth=1;
+        for(var gx=0;gx<W;gx+=22){ ctx.beginPath();ctx.moveTo(gx,0);ctx.lineTo(gx,H);ctx.stroke(); }
+        for(var gy=0;gy<H;gy+=22){ ctx.beginPath();ctx.moveTo(0,gy);ctx.lineTo(W,gy);ctx.stroke(); }
+        shapes.forEach(function(s){
+          ctx.save(); ctx.fillStyle=s.c; ctx.globalAlpha=0.92;
+          if(s.kind==='rect'){ ctx.fillRect(s.x,s.y,s.w,s.w); }
+          else { ctx.beginPath(); ctx.arc(s.x+s.r,s.y+s.r,s.r,0,Math.PI*2); ctx.fill(); }
+          ctx.restore();
+        });
+        if(!shapes.length){ ctx.fillStyle='#5C616B'; ctx.font='13px ui-monospace,monospace'; ctx.fillText('press a button to call the API ->', 14, H/2); }
+        dirty=false;
+      }
+      raf=requestAnimationFrame(frame);
+    }
+    emit('ready', 'new DrawBoard("#stage")');
+    whenVisible(canvas,
+      function(){ if(running)return; v.refit(); dirty=true; running=true; last=performance.now(); raf=requestAnimationFrame(frame); },
+      function(){ running=false; cancelAnimationFrame(raf); });
+  });
+
+  /* ---------------- Approach: class component ---------------- */
+  safe('classDemo', function(){
+    var canvas=document.getElementById('classCanvas'); if(!canvas) return;
+    var out=document.getElementById('classOut');
+    // A self-contained component authored as a class (constructor function here for ES5).
+    function Pulse(view){ this.v=view; this.t=0; this.alive=true; this.running=false; }
+    Pulse.prototype.start=function(){
+      if(this.running)return; this.running=true; this.last=performance.now(); var self=this;
+      (function loop(now){ if(!self.running||!self.alive)return; self.update((now-self.last)/1000); self.last=now; self.raf=requestAnimationFrame(loop); })(performance.now());
+    };
+    Pulse.prototype.stop=function(){ this.running=false; cancelAnimationFrame(this.raf); };
+    Pulse.prototype.update=function(dt){ if(!reduce) this.t+=dt; this.draw(); };
+    Pulse.prototype.draw=function(){
+      var c=this.v.ctx,W=this.v.w,H=this.v.h; c.clearRect(0,0,W,H);
+      var r=20+12*Math.abs(Math.sin(this.t*2));
+      c.globalAlpha=0.9; c.fillStyle='#2B44E0'; c.beginPath(); c.arc(W/2,H/2,r,0,Math.PI*2); c.fill(); c.globalAlpha=1;
+      c.fillStyle='#5C616B'; c.font='12px ui-monospace,monospace'; c.fillText('Pulse instance \u00B7 running='+this.running, 12, H-12);
+    };
+    Pulse.prototype.destroy=function(){ this.stop(); this.alive=false; this.v.ctx.clearRect(0,0,this.v.w,this.v.h); };
+    var v=makeView(canvas), inst=null;
+    function say(t){ if(out) out.textContent=t; }
+    function bind(id,fn){ var el=document.getElementById(id); if(el) el.addEventListener('click',fn); }
+    function ensure(){ if(!inst||!inst.alive){ inst=new Pulse(v); say('new Pulse(host) created'); } }
+    bind('classStart', function(){ v.refit(); ensure(); inst.start(); say('instance.start()'); });
+    bind('classStop', function(){ if(inst){ inst.stop(); say('instance.stop()'); } });
+    bind('classDestroy', function(){ if(inst){ inst.destroy(); inst=null; say('instance.destroy() \u2014 state gone'); } });
+    whenVisible(canvas, function(){ v.refit(); ensure(); inst.draw(); }, function(){ if(inst) inst.stop(); });
+  });
+
+  /* ---------------- Approach: factory + closure ---------------- */
+  safe('factoryDemo', function(){
+    var canvas=document.getElementById('factoryCanvas'); if(!canvas) return;
+    var out=document.getElementById('factoryOut');
+    var v=makeView(canvas);
+    // Factory + closure: `count` is private; only the returned API can touch it.
+    function createCounter(view){
+      var count=0;                                  // private — unreachable from outside
+      function render(){
+        var c=view.ctx,W=view.w,H=view.h; c.clearRect(0,0,W,H);
+        c.fillStyle='#16181D'; c.font='600 44px system-ui,sans-serif'; c.textAlign='center';
+        c.fillText(String(count), W/2, H/2+15); c.textAlign='left';
+        c.fillStyle='#5C616B'; c.font='12px ui-monospace,monospace'; c.fillText('private count via closure', 12, H-12);
+      }
+      return { increment:function(){ count++; render(); return count; },
+               reset:function(){ count=0; render(); },
+               get:function(){ return count; }, render:render };
+    }
+    var api=createCounter(v);
+    function bind(id,fn){ var el=document.getElementById(id); if(el) el.addEventListener('click',fn); }
+    bind('factoryIncrement', function(){ var n=api.increment(); if(out) out.textContent='api.increment() -> '+n; });
+    bind('factoryReset', function(){ api.reset(); if(out) out.textContent='api.reset() -> 0'; });
+    whenVisible(canvas, function(){ v.refit(); api.render(); }, function(){});
+  });
+
+  /* ---------------- Approach: event emitter ---------------- */
+  safe('eventDemo', function(){
+    var out=document.getElementById('eventOut'); if(!out) return;
+    function Emitter(){ this.map={}; }
+    Emitter.prototype.on=function(t,fn){ (this.map[t]||(this.map[t]=[])).push(fn); return this; };
+    Emitter.prototype.off=function(t,fn){ var a=this.map[t]; if(a){ var i=a.indexOf(fn); if(i>=0)a.splice(i,1); } return this; };
+    Emitter.prototype.emit=function(t,p){ (this.map[t]||[]).slice().forEach(function(fn){ fn(p); }); return this; };
+    var bus=new Emitter(), n=0;
+    function log(line){ var d=document.createElement('div'); d.className='ev'; d.textContent=line; out.appendChild(d); out.scrollTop=out.scrollHeight; while(out.children.length>40) out.removeChild(out.firstChild); }
+    function handler(p){ log('   handler received: '+JSON.stringify(p)); }
+    function bind(id,fn){ var el=document.getElementById(id); if(el) el.addEventListener('click',fn); }
+    bind('eventSubscribe',   function(){ bus.on('change', handler); log("bus.on('change', handler)"); });
+    bind('eventEmit',        function(){ n++; log("bus.emit('change', { n:"+n+" })"); bus.emit('change',{n:n}); });
+    bind('eventUnsubscribe', function(){ bus.off('change', handler); log("bus.off('change', handler)"); });
+    log('emitter ready');
+  });
+
+  /* ---------------- Approach: plugin system ---------------- */
+  safe('pluginDemo', function(){
+    var canvas=document.getElementById('pluginCanvas'); if(!canvas) return;
+    var out=document.getElementById('pluginOut');
+    var v=makeView(canvas);
+    // Tiny core + opt-in plugins. A plugin is just { install(board) }.
+    function Board(view){ this.v=view; this.boxes=[]; this.plugins=[]; this.gridOn=false; }
+    Board.prototype.use=function(p){ this.plugins.push(p); p.install(this); return this; };
+    Board.prototype.addBox=function(){ this.boxes.push({ x:Math.random()*(this.v.w-40)+4, y:Math.random()*(this.v.h-40)+4 }); this.render(); };
+    Board.prototype.render=function(){
+      var c=this.v.ctx,W=this.v.w,H=this.v.h; c.clearRect(0,0,W,H);
+      if(this.gridOn){ c.strokeStyle='rgba(43,68,224,0.18)'; c.lineWidth=1;
+        for(var gx=0;gx<W;gx+=20){c.beginPath();c.moveTo(gx,0);c.lineTo(gx,H);c.stroke();}
+        for(var gy=0;gy<H;gy+=20){c.beginPath();c.moveTo(0,gy);c.lineTo(W,gy);c.stroke();} }
+      c.fillStyle='#2B44E0'; this.boxes.forEach(function(b){ c.fillRect(b.x,b.y,30,30); });
+      c.fillStyle='#5C616B'; c.font='12px ui-monospace,monospace'; c.fillText('plugins: '+this.plugins.length+(this.gridOn?' \u00B7 grid ON':''), 12, H-12);
+    };
+    var GridPlugin={ name:'grid', install:function(board){ board.toggleGrid=function(){ board.gridOn=!board.gridOn; board.render(); }; } };
+    var board=new Board(v).use(GridPlugin);
+    function bind(id,fn){ var el=document.getElementById(id); if(el) el.addEventListener('click',fn); }
+    bind('pluginAddBox', function(){ board.addBox(); if(out) out.textContent='board.addBox()  (core feature)'; });
+    bind('pluginToggle', function(){ board.toggleGrid(); if(out) out.textContent='GridPlugin.install added toggleGrid() -> '+(board.gridOn?'on':'off'); });
+    whenVisible(canvas, function(){ v.refit(); board.render(); }, function(){});
+  });
+
+  /* ---------------- TOC scroll-spy ---------------- */
+  safe('toc', function(){
+    var links=[].slice.call(document.querySelectorAll('nav.toc a'));
+    if(!links.length || !('IntersectionObserver' in window)) return;
+    var map={}; links.forEach(function(a){ map[a.getAttribute('href').slice(1)]=a; });
+    var io=new IntersectionObserver(function(ents){
+      ents.forEach(function(e){
+        if(e.isIntersecting){ links.forEach(function(l){l.classList.remove('active');}); var a=map[e.target.id]; if(a)a.classList.add('active'); }
+      });
+    },{rootMargin:'-20% 0px -70% 0px'});
+    document.querySelectorAll('main section[id]').forEach(function(s){ io.observe(s); });
+  });
+
+  /* ---------------- one debounced resize for everything ---------------- */
+  var rtimer;
+  window.addEventListener('resize', function(){
+    clearTimeout(rtimer);
+    rtimer = setTimeout(function(){
+      views.forEach(function(v){ try{ if(v.refit() && v.onResize) v.onResize(); }catch(e){} });
+      var nv=document.getElementById('dprNaive'); if(nv && nv.__resize){ try{ nv.__resize(); }catch(e){} }
+    }, 160);
+  });
+
+  } /* end boot */
+
+  onReady(function(){ try{ boot(); }catch(e){ if(window.console&&console.error) console.error('boot failed:', e); } });
+})();
+</script>
+</body>
+</html>
