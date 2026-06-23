@@ -1,0 +1,639 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Infinite Rows Random Caption Demo</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #111214;
+      --panel: #1b1d22;
+      --panel-2: #242832;
+      --text: #f2f2f2;
+      --muted: #aeb4c0;
+      --accent: #70b7ff;
+      --border: #3a4050;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+      background:
+        radial-gradient(circle at top, #242936 0, transparent 40%),
+        var(--bg);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--text);
+    }
+
+    .app {
+      width: min(960px, 100%);
+      padding: 18px;
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      background: linear-gradient(180deg, var(--panel), #15171c);
+      box-shadow: 0 22px 70px rgba(0, 0, 0, 0.4);
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 16px;
+      margin-bottom: 14px;
+    }
+
+    h1 {
+      margin: 0 0 5px;
+      font-size: clamp(20px, 4vw, 30px);
+      line-height: 1.1;
+    }
+
+    .subtitle {
+      margin: 0;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.45;
+    }
+
+    .controls {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    button {
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 10px 16px;
+      font: inherit;
+      font-weight: 700;
+      color: var(--text);
+      background: var(--panel-2);
+      cursor: pointer;
+      touch-action: manipulation;
+    }
+
+    button:hover {
+      border-color: var(--accent);
+    }
+
+    button:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+
+    .canvas-shell {
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      overflow: hidden;
+      background: #050608;
+      user-select: none;
+      touch-action: none;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: auto;
+      cursor: grab;
+    }
+
+    canvas.dragging {
+      cursor: grabbing;
+    }
+
+    .info {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .card {
+      min-height: 68px;
+      padding: 12px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.035);
+    }
+
+    .label {
+      display: block;
+      margin-bottom: 4px;
+      color: var(--muted);
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .value {
+      font-size: 15px;
+      line-height: 1.35;
+    }
+
+    @media (max-width: 700px) {
+      body {
+        padding: 12px;
+      }
+
+      .app {
+        padding: 12px;
+      }
+
+      .header {
+        flex-direction: column;
+      }
+
+      .controls {
+        justify-content: flex-start;
+      }
+
+      .info {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <section class="header" aria-label="Demo header">
+      <div>
+        <h1>Infinite Rows — Random Caption Delay</h1>
+        <p class="subtitle">
+          Drag the canvas vertically. The board is an infinite viewport. Every 3 seconds,
+          only currently visible tiles receive a random 1–2 second delay, then their caption
+          instantly changes to A, B, or C. No tile movement animation is used.
+        </p>
+      </div>
+
+      <div class="controls" aria-label="Controls">
+        <button id="startBtn" type="button">Start</button>
+        <button id="stopBtn" type="button" disabled>Stop</button>
+      </div>
+    </section>
+
+    <section class="canvas-shell" aria-label="Infinite rows viewport">
+      <canvas id="board" aria-label="Infinite split flap rows demo"></canvas>
+    </section>
+
+    <section class="info" aria-label="Status">
+      <div class="card">
+        <span class="label">Timer</span>
+        <div class="value" id="timerStatus">Stopped</div>
+      </div>
+      <div class="card">
+        <span class="label">Visible rows</span>
+        <div class="value" id="visibleStatus">—</div>
+      </div>
+      <div class="card">
+        <span class="label">Last tick</span>
+        <div class="value" id="tickStatus">No tick yet</div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    "use strict";
+
+    /*
+      Infinite rows random caption demo
+      ---------------------------------
+      This keeps the same core idea as the previous infinite rows viewport:
+      the canvas is only a finite viewport, while the row indices are virtual
+      and can continue forever in both directions.
+
+      Important difference:
+      There is no tile movement and no requestAnimationFrame animation loop.
+      Rendering happens only when something changes:
+        - the user drags / scrolls the virtual board
+        - a delayed random caption update fires
+        - the canvas is resized for device-pixel-ratio
+    */
+
+    const canvas = document.getElementById("board");
+    const ctx = canvas.getContext("2d");
+
+    const startBtn = document.getElementById("startBtn");
+    const stopBtn = document.getElementById("stopBtn");
+    const timerStatus = document.getElementById("timerStatus");
+    const visibleStatus = document.getElementById("visibleStatus");
+    const tickStatus = document.getElementById("tickStatus");
+
+    const CONFIG = {
+      columns: 3,
+      tileWidth: 180,
+      tileHeight: 112,
+      tileGap: 16,
+      rowGap: 18,
+      viewportRows: 3.5,
+      timerMs: 3000,
+      minDelaySeconds: 1,
+      maxDelaySeconds: 2,
+      captions: ["A", "B", "C"],
+      maxCachedRows: 20
+    };
+
+    const state = {
+      // This is the virtual scroll offset inside the infinite board.
+      // It can become positive or negative.
+      scrollY: 0,
+
+      // The board stores only row models that are relevant to the current view.
+      // Keys are virtual row indices: ..., -2, -1, 0, 1, 2, ...
+      rowCache: new Map(),
+
+      // setInterval id for the 3 second timer.
+      intervalId: null,
+
+      // setTimeout ids for delayed tile caption changes.
+      pendingTimeouts: new Set(),
+
+      // Pointer drag state.
+      dragging: false,
+      lastPointerY: 0,
+
+      // Canvas logical CSS pixels. The physical backing canvas is scaled by DPR.
+      cssWidth: 0,
+      cssHeight: 0,
+
+      // Current visible rows snapshot, updated by createVisibleView().
+      visibleFirstRow: 0,
+      visibleLastRow: 0
+    };
+
+    const rowPitch = CONFIG.tileHeight + CONFIG.rowGap;
+    const boardWidth = CONFIG.columns * CONFIG.tileWidth + (CONFIG.columns - 1) * CONFIG.tileGap;
+    const boardHeight = Math.round(CONFIG.viewportRows * rowPitch - CONFIG.rowGap);
+
+    function randomCaption() {
+      return CONFIG.captions[Math.floor(Math.random() * CONFIG.captions.length)];
+    }
+
+    function randomDelaySeconds() {
+      const min = CONFIG.minDelaySeconds;
+      const max = CONFIG.maxDelaySeconds;
+
+      // Continuous random delay between 1.000 and 2.000 seconds.
+      // Change this to `Math.random() < 0.5 ? 1 : 2` if you want only integer delays.
+      return min + Math.random() * (max - min);
+    }
+
+    function initialCaptionForColumn(columnIndex) {
+      return CONFIG.captions[columnIndex % CONFIG.captions.length];
+    }
+
+    class TileModel {
+      constructor(rowIndex, columnIndex) {
+        this.rowIndex = rowIndex;
+        this.columnIndex = columnIndex;
+        this.caption = initialCaptionForColumn(columnIndex);
+        this.pending = false;
+      }
+    }
+
+    class RowModel {
+      constructor(rowIndex) {
+        this.rowIndex = rowIndex;
+        this.tiles = Array.from(
+          { length: CONFIG.columns },
+          (_, columnIndex) => new TileModel(rowIndex, columnIndex)
+        );
+      }
+    }
+
+    function getOrCreateRow(rowIndex) {
+      let row = state.rowCache.get(rowIndex);
+
+      if (!row) {
+        row = new RowModel(rowIndex);
+        state.rowCache.set(rowIndex, row);
+      }
+
+      return row;
+    }
+
+    function isRowVisible(rowIndex) {
+      return rowIndex >= state.visibleFirstRow && rowIndex <= state.visibleLastRow;
+    }
+
+    function isTileVisible(tile) {
+      return isRowVisible(tile.rowIndex);
+    }
+
+    function createVisibleView() {
+      /*
+        The canvas is finite, but row indices are virtual.
+
+        Example:
+        if scrollY is 170 and rowPitch is 130, firstRow is 1.
+        Row 1 will appear at y = rowIndex * rowPitch - scrollY.
+
+        rowY can be negative when the row is partially above the viewport.
+        That is normal and means the row intersects the upper canvas edge.
+      */
+      const firstRow = Math.floor(state.scrollY / rowPitch);
+      const lastRow = Math.floor((state.scrollY + state.cssHeight) / rowPitch);
+
+      state.visibleFirstRow = firstRow;
+      state.visibleLastRow = lastRow;
+
+      const rows = [];
+      for (let rowIndex = firstRow; rowIndex <= lastRow; rowIndex += 1) {
+        rows.push(getOrCreateRow(rowIndex));
+      }
+
+      pruneRowCache(firstRow, lastRow);
+      updateVisibleStatus();
+      return rows;
+    }
+
+    function pruneRowCache(firstVisibleRow, lastVisibleRow) {
+      /*
+        The board is infinite, but the cache is intentionally small.
+        Rows far away from the current viewport are removed.
+      */
+      const keepPadding = Math.max(2, CONFIG.maxCachedRows - (lastVisibleRow - firstVisibleRow + 1));
+      const minKeep = firstVisibleRow - keepPadding;
+      const maxKeep = lastVisibleRow + keepPadding;
+
+      for (const rowIndex of state.rowCache.keys()) {
+        if (rowIndex < minKeep || rowIndex > maxKeep) {
+          state.rowCache.delete(rowIndex);
+        }
+      }
+    }
+
+    function render() {
+      const rows = createVisibleView();
+
+      ctx.clearRect(0, 0, state.cssWidth, state.cssHeight);
+      drawBackground();
+
+      const startX = Math.round((state.cssWidth - boardWidth) / 2);
+
+      for (const row of rows) {
+        const rowY = Math.round(row.rowIndex * rowPitch - state.scrollY);
+        drawRow(row, startX, rowY);
+      }
+    }
+
+    function drawBackground() {
+      ctx.save();
+      ctx.fillStyle = "#07080b";
+      ctx.fillRect(0, 0, state.cssWidth, state.cssHeight);
+
+      // Subtle horizontal guide lines help show that the canvas is a viewport.
+      ctx.globalAlpha = 0.12;
+      ctx.strokeStyle = "#ffffff";
+      ctx.lineWidth = 1;
+      for (let y = -((state.scrollY % rowPitch + rowPitch) % rowPitch); y < state.cssHeight; y += rowPitch) {
+        ctx.beginPath();
+        ctx.moveTo(0, Math.round(y) + 0.5);
+        ctx.lineTo(state.cssWidth, Math.round(y) + 0.5);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+
+    function drawRow(row, startX, rowY) {
+      for (const tile of row.tiles) {
+        const x = startX + tile.columnIndex * (CONFIG.tileWidth + CONFIG.tileGap);
+        drawTile(tile, x, rowY, CONFIG.tileWidth, CONFIG.tileHeight);
+      }
+    }
+
+    function drawTile(tile, x, y, width, height) {
+      const radius = 14;
+
+      ctx.save();
+      ctx.translate(x, y);
+
+      // Tile shadow.
+      ctx.shadowColor = "rgba(0, 0, 0, 0.55)";
+      ctx.shadowBlur = 20;
+      ctx.shadowOffsetY = 10;
+
+      roundedRect(0, 0, width, height, radius);
+      ctx.fillStyle = "#181b22";
+      ctx.fill();
+
+      ctx.shadowColor = "transparent";
+
+      // Top/bottom split-flap halves. They do not move in this demo.
+      roundedRect(6, 6, width - 12, height / 2 - 6, 10);
+      ctx.fillStyle = "#242936";
+      ctx.fill();
+
+      roundedRect(6, height / 2, width - 12, height / 2 - 6, 10);
+      ctx.fillStyle = "#12151b";
+      ctx.fill();
+
+      // Middle hinge line.
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.18)";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(8, height / 2);
+      ctx.lineTo(width - 8, height / 2);
+      ctx.stroke();
+
+      // Outer border.
+      roundedRect(0.5, 0.5, width - 1, height - 1, radius);
+      ctx.strokeStyle = tile.pending ? "rgba(112, 183, 255, 0.9)" : "rgba(255, 255, 255, 0.18)";
+      ctx.lineWidth = tile.pending ? 3 : 1;
+      ctx.stroke();
+
+      // Caption.
+      ctx.fillStyle = "#f4f5f7";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.font = "800 64px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace";
+      ctx.fillText(tile.caption, width / 2, height / 2 + 2);
+
+      // Small row/column label for debugging the infinite viewport behavior.
+      ctx.fillStyle = "rgba(255, 255, 255, 0.38)";
+      ctx.font = "600 11px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace";
+      ctx.textAlign = "left";
+      ctx.textBaseline = "top";
+      ctx.fillText(`r${tile.rowIndex} c${tile.columnIndex}`, 12, 10);
+
+      ctx.restore();
+    }
+
+    function roundedRect(x, y, width, height, radius) {
+      const r = Math.min(radius, width / 2, height / 2);
+
+      ctx.beginPath();
+      ctx.moveTo(x + r, y);
+      ctx.lineTo(x + width - r, y);
+      ctx.quadraticCurveTo(x + width, y, x + width, y + r);
+      ctx.lineTo(x + width, y + height - r);
+      ctx.quadraticCurveTo(x + width, y + height, x + width - r, y + height);
+      ctx.lineTo(x + r, y + height);
+      ctx.quadraticCurveTo(x, y + height, x, y + height - r);
+      ctx.lineTo(x, y + r);
+      ctx.quadraticCurveTo(x, y, x + r, y);
+      ctx.closePath();
+    }
+
+    function startTimer() {
+      if (state.intervalId !== null) return;
+
+      state.intervalId = window.setInterval(timerTick, CONFIG.timerMs);
+      startBtn.disabled = true;
+      stopBtn.disabled = false;
+      timerStatus.textContent = "Running — callback every 3 seconds";
+    }
+
+    function stopTimer() {
+      if (state.intervalId !== null) {
+        window.clearInterval(state.intervalId);
+        state.intervalId = null;
+      }
+
+      // Stop also cancels delayed caption changes that were already scheduled.
+      for (const timeoutId of state.pendingTimeouts) {
+        window.clearTimeout(timeoutId);
+      }
+      state.pendingTimeouts.clear();
+
+      for (const row of state.rowCache.values()) {
+        for (const tile of row.tiles) {
+          tile.pending = false;
+        }
+      }
+
+      startBtn.disabled = false;
+      stopBtn.disabled = true;
+      timerStatus.textContent = "Stopped";
+      render();
+    }
+
+    function timerTick() {
+      /*
+        This is the 3 second timer callback requested in the prompt.
+
+        For each currently visible tile:
+          1. Choose a random delay between 1 and 2 seconds.
+          2. Choose a random target caption: A, B, or C.
+          3. After the chosen delay passes, update the tile caption instantly.
+
+        There is no row movement and no tile flip animation here.
+      */
+      const rows = createVisibleView();
+      const visibleTiles = rows.flatMap(row => row.tiles);
+      const scheduledCount = visibleTiles.length;
+
+      for (const tile of visibleTiles) {
+        const delaySeconds = randomDelaySeconds();
+        const nextCaption = randomCaption();
+
+        tile.pending = true;
+
+        const timeoutId = window.setTimeout(() => {
+          state.pendingTimeouts.delete(timeoutId);
+
+          // If the user dragged far away, this old tile may no longer be visible.
+          // We skip it so that only visible rows are updated.
+          if (!isTileVisible(tile)) {
+            tile.pending = false;
+            render();
+            return;
+          }
+
+          tile.caption = nextCaption;
+          tile.pending = false;
+          render();
+        }, delaySeconds * 1000);
+
+        state.pendingTimeouts.add(timeoutId);
+      }
+
+      const now = new Date().toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit"
+      });
+
+      tickStatus.textContent = `${now}: scheduled ${scheduledCount} visible tiles, each delayed 1–2s`;
+      render();
+    }
+
+    function updateVisibleStatus() {
+      visibleStatus.textContent = `${state.visibleFirstRow} … ${state.visibleLastRow}`;
+    }
+
+    function resizeCanvas() {
+      const dpr = Math.max(1, window.devicePixelRatio || 1);
+      const shell = canvas.parentElement;
+      const availableWidth = Math.max(320, shell.clientWidth);
+
+      state.cssWidth = availableWidth;
+      state.cssHeight = boardHeight;
+
+      canvas.style.width = `${state.cssWidth}px`;
+      canvas.style.height = `${state.cssHeight}px`;
+      canvas.width = Math.round(state.cssWidth * dpr);
+      canvas.height = Math.round(state.cssHeight * dpr);
+
+      // From this point on, all drawing uses CSS pixels.
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      render();
+    }
+
+    function onPointerDown(event) {
+      state.dragging = true;
+      state.lastPointerY = event.clientY;
+      canvas.classList.add("dragging");
+      canvas.setPointerCapture(event.pointerId);
+    }
+
+    function onPointerMove(event) {
+      if (!state.dragging) return;
+
+      const dy = event.clientY - state.lastPointerY;
+      state.lastPointerY = event.clientY;
+
+      // Dragging down moves the virtual board down, so scrollY decreases.
+      state.scrollY -= dy;
+      render();
+    }
+
+    function onPointerUp(event) {
+      state.dragging = false;
+      canvas.classList.remove("dragging");
+
+      if (canvas.hasPointerCapture(event.pointerId)) {
+        canvas.releasePointerCapture(event.pointerId);
+      }
+    }
+
+    function onWheel(event) {
+      event.preventDefault();
+      state.scrollY += event.deltaY;
+      render();
+    }
+
+    startBtn.addEventListener("click", startTimer);
+    stopBtn.addEventListener("click", stopTimer);
+
+    canvas.addEventListener("pointerdown", onPointerDown);
+    canvas.addEventListener("pointermove", onPointerMove);
+    canvas.addEventListener("pointerup", onPointerUp);
+    canvas.addEventListener("pointercancel", onPointerUp);
+    canvas.addEventListener("wheel", onWheel, { passive: false });
+
+    window.addEventListener("resize", resizeCanvas);
+
+    resizeCanvas();
+  </script>
+</body>
+</html>
