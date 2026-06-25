@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Display Resolution Check</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #111;
+      color: #eee;
+      display: grid;
+      place-items: center;
+      min-height: 100vh;
+    }
+
+    .card {
+      width: min(92vw, 620px);
+      padding: 28px;
+      border-radius: 18px;
+      background: #1e1e1e;
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
+    }
+
+    h1 {
+      margin: 0 0 22px;
+      font-size: 28px;
+    }
+
+    .row {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 14px 0;
+      border-bottom: 1px solid #333;
+      font-size: 18px;
+    }
+
+    .row:last-child {
+      border-bottom: 0;
+    }
+
+    .label {
+      color: #aaa;
+    }
+
+    .value {
+      font-weight: 700;
+      text-align: right;
+    }
+
+    .note {
+      margin-top: 22px;
+      color: #aaa;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+  </style>
+</head>
+<body>
+  <main class="card">
+    <h1>Resolution Info</h1>
+
+    <div class="row">
+      <div class="label">Display resolution</div>
+      <div class="value" id="displayResolution">-</div>
+    </div>
+
+    <div class="row">
+      <div class="label">CSS screen resolution</div>
+      <div class="value" id="cssScreenResolution">-</div>
+    </div>
+
+    <div class="row">
+      <div class="label">CSS viewport size</div>
+      <div class="value" id="cssViewportSize">-</div>
+    </div>
+
+    <div class="row">
+      <div class="label">Device pixel ratio</div>
+      <div class="value" id="dpr">-</div>
+    </div>
+
+    <div class="note">
+      Display resolution is calculated as CSS screen size × devicePixelRatio.
+      CSS viewport size is the current browser viewport in CSS pixels.
+    </div>
+  </main>
+
+  <script>
+    function updateResolutionInfo() {
+      const dpr = window.devicePixelRatio || 1;
+
+      const cssScreenWidth = window.screen.width;
+      const cssScreenHeight = window.screen.height;
+
+      const displayWidth = Math.round(cssScreenWidth * dpr);
+      const displayHeight = Math.round(cssScreenHeight * dpr);
+
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+
+      document.getElementById("displayResolution").textContent =
+        `${displayWidth} × ${displayHeight} px`;
+
+      document.getElementById("cssScreenResolution").textContent =
+        `${cssScreenWidth} × ${cssScreenHeight} CSS px`;
+
+      document.getElementById("cssViewportSize").textContent =
+        `${viewportWidth} × ${viewportHeight} CSS px`;
+
+      document.getElementById("dpr").textContent =
+        dpr.toFixed(2);
+    }
+
+    updateResolutionInfo();
+
+    window.addEventListener("resize", updateResolutionInfo);
+    window.addEventListener("orientationchange", updateResolutionInfo);
+
+    // Also refresh periodically because mobile browser UI bars can change viewport height.
+    setInterval(updateResolutionInfo, 500);
+  </script>
+</body>
+</html>
